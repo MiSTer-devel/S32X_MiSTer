@@ -1,0 +1,6 @@
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) 32X_PKG.sv ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) MDROM.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) SHROM.v ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) IF.sv ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) VDP.sv ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) 32X.sv ]
