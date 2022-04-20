@@ -30,7 +30,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [45:0] HPS_BUS,
+	inout  [48:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -40,8 +40,9 @@ module emu
 	output        CE_PIXEL,
 
 	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	output  [7:0] VIDEO_ARX,
-	output  [7:0] VIDEO_ARY,
+	//if VIDEO_ARX[12] or VIDEO_ARY[12] is set then [11:0] contains scaled size instead of aspect ratio.
+	output [12:0] VIDEO_ARX,
+	output [12:0] VIDEO_ARY,
 
 	output  [7:0] VGA_R,
 	output  [7:0] VGA_G,
@@ -51,6 +52,40 @@ module emu
 	output        VGA_DE,    // = ~(VBlank | HBlank)
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
+	output        VGA_SCALER, // Force VGA scaler
+
+	input  [11:0] HDMI_WIDTH,
+	input  [11:0] HDMI_HEIGHT,
+	output        HDMI_FREEZE,
+
+`ifdef MISTER_FB
+	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
+	// FB_FORMAT:
+	//    [2:0] : 011=8bpp(palette) 100=16bpp 101=24bpp 110=32bpp
+	//    [3]   : 0=16bits 565 1=16bits 1555
+	//    [4]   : 0=RGB  1=BGR (for 16/24/32 modes)
+	//
+	// FB_STRIDE either 0 (rounded to 256 bytes) or multiple of pixel size (in bytes)
+	output        FB_EN,
+	output  [4:0] FB_FORMAT,
+	output [11:0] FB_WIDTH,
+	output [11:0] FB_HEIGHT,
+	output [31:0] FB_BASE,
+	output [13:0] FB_STRIDE,
+	input         FB_VBL,
+	input         FB_LL,
+	output        FB_FORCE_BLANK,
+
+`ifdef MISTER_FB_PALETTE
+	// Palette control for 8bit modes.
+	// Ignored for other video modes.
+	output        FB_PAL_CLK,
+	output  [7:0] FB_PAL_ADDR,
+	output [23:0] FB_PAL_DOUT,
+	input  [23:0] FB_PAL_DIN,
+	output        FB_PAL_WR,
+`endif
+`endif
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -65,9 +100,10 @@ module emu
 	// b[0]: osd button
 	output  [1:0] BUTTONS,
 
+	input         CLK_AUDIO, // 24.576 MHz
 	output [15:0] AUDIO_L,
 	output [15:0] AUDIO_R,
-	output        AUDIO_S, // 1 - signed audio samples, 0 - unsigned
+	output        AUDIO_S,   // 1 - signed audio samples, 0 - unsigned
 	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
 
 	//ADC
@@ -106,8 +142,9 @@ module emu
 	output        SDRAM_nRAS,
 	output        SDRAM_nWE,
 
-`ifdef DUAL_SDRAM
+`ifdef MISTER_DUAL_SDRAM
 	//Secondary SDRAM
+	//Set all output SDRAM_* signals to Z ASAP if SDRAM2_EN is 0
 	input         SDRAM2_EN,
 	output        SDRAM2_CLK,
 	output [12:0] SDRAM2_A,
@@ -142,54 +179,70 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign BUTTONS   = osd_btn;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 
-always_comb begin
-	if (status[10]) begin
-		VIDEO_ARX = 8'd16;
-		VIDEO_ARY = 8'd9;
-	end else begin
-		case(res) // {V30, H40}
-			2'b00: begin // 256 x 224
-				VIDEO_ARX = 8'd64;
-				VIDEO_ARY = 8'd49;
-			end
-
-			2'b01: begin // 320 x 224
-				VIDEO_ARX = status[30] ? 8'd10: 8'd64;
-				VIDEO_ARY = status[30] ? 8'd7 : 8'd49;
-			end
-
-			2'b10: begin // 256 x 240
-				VIDEO_ARX = 8'd128;
-				VIDEO_ARY = 8'd105;
-			end
-
-			2'b11: begin // 320 x 240
-				VIDEO_ARX = status[30] ? 8'd4 : 8'd128;
-				VIDEO_ARY = status[30] ? 8'd3 : 8'd105;
-			end
-		endcase
-	end
-end
-
-//assign VIDEO_ARX = status[10] ? 8'd16 : ((status[30] && wide_ar) ? 8'd10 : 8'd64);
-//assign VIDEO_ARY = status[10] ? 8'd9  : ((status[30] && wide_ar) ? 8'd7  : 8'd49);
-
-assign AUDIO_S = 1;
-assign AUDIO_MIX = 0;
-
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign LED_USER  = cart_download | sav_pending;
 
+assign VGA_SCALER= 0;
 
-///////////////////////////////////////////////////
+assign AUDIO_S = 1;
+assign AUDIO_MIX = 0;
+assign HDMI_FREEZE = 0;
+
+wire [1:0] ar = status[49:48];
+wire [7:0] arx,ary;
+
+always_comb begin
+	case(res) // {V30, H40}
+		2'b00: begin // 256 x 224
+			arx = 8'd64;
+			ary = 8'd49;
+		end
+
+		2'b01: begin // 320 x 224
+			arx = status[30] ? 8'd10: 8'd64;
+			ary = status[30] ? 8'd7 : 8'd49;
+		end
+
+		2'b10: begin // 256 x 240
+			arx = 8'd128;
+			ary = 8'd105;
+		end
+
+		2'b11: begin // 320 x 240
+			arx = status[30] ? 8'd4 : 8'd128;
+			ary = status[30] ? 8'd3 : 8'd105;
+		end
+	endcase
+end
+
+wire       vcrop_en = status[34];
+wire [3:0] vcopt    = status[53:50];
+reg        en216p;
+reg  [4:0] voff;
+always @(posedge CLK_VIDEO) begin
+	en216p <= ((HDMI_WIDTH == 1920) && (HDMI_HEIGHT == 1080) && !forced_scandoubler && !scale);
+	voff <= (vcopt < 6) ? {vcopt,1'b0} : ({vcopt,1'b0} - 5'd24);
+end
+
+wire vga_de;
+video_freak video_freak
+(
+	.*,
+	.VGA_DE_IN(vga_de),
+	.ARX((!ar) ? arx : (ar - 1'd1)),
+	.ARY((!ar) ? ary : 12'd0),
+	.CROP_SIZE((en216p & vcrop_en) ? 10'd216 : 10'd0),
+	.CROP_OFF(voff),
+	.SCALE(status[55:54])
+);
 
 // Status Bit Map:
 //             Upper                             Lower              
 // 0         1         2         3          4         5         6   
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXX XXX XXXXXXXXXXXXXXXXXXX XX XXXXXXXXXXXXX               
+// XXXXXXXXXXXX XXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v"
 localparam CONF_STR = {
@@ -212,9 +265,13 @@ localparam CONF_STR = {
 
 	"P1,Audio & Video;",
 	"P1-;",
-	"P1OA,Aspect Ratio,4:3,16:9;",
+	"P1oGH,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P1OU,320x224 Aspect,Original,Corrected;",
 	"P1O13,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"P1-;",
+	"d5P1o2,Vertical Crop,Disabled,216p(5x);",
+	"d5P1oIL,Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
+	"P1oMN,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"P1-;",
 	"P1OT,Border,No,Yes;",
 	"P1oEF,Composite Blend,Off,On,Adaptive;",
@@ -287,20 +344,18 @@ wire [24:0] ps2_mouse;
 wire [21:0] gamma_bus;
 wire [15:0] sdram_sz;
 
-hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
-
-	.conf_str(CONF_STR),
 
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
 	.joystick_2(joystick_2),
 	.joystick_3(joystick_3),
 	.joystick_4(joystick_4),
-	.joystick_analog_0({joy0_y, joy0_x}),
-	.joystick_analog_1({joy1_y, joy1_x}),
+	.joystick_l_analog_0({joy0_y, joy0_x}),
+	.joystick_l_analog_1({joy1_y, joy1_x}),
 
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
@@ -309,7 +364,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 	.status(status),
 	.status_in({status[63:8],region_req,status[5:0]}),
 	.status_set(region_set),
-	.status_menumask({!gun_mode,1'b1,status[9],~gg_available,~bk_ena}),
+	.status_menumask({en216p,!gun_mode,1'b1,status[9],~gg_available,~bk_ena}),
 
 	.ioctl_download(ioctl_download),
 	.ioctl_index(ioctl_index),
@@ -318,13 +373,13 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 	.ioctl_dout(ioctl_data),
 	.ioctl_wait(ioctl_wait),
 
-	.sd_lba(sd_lba),
+	.sd_lba('{sd_lba}),
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din(sd_buff_din),
+	.sd_buff_din('{sd_buff_din}),
 	.sd_buff_wr(sd_buff_wr),
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
@@ -372,9 +427,67 @@ pll pll
 	.rst(0),
 	.outclk_0(clk_sys),
 	.outclk_1(clk_ram),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll),
 	.locked(locked)
 );
 
+wire [63:0] reconfig_to_pll;
+wire [63:0] reconfig_from_pll;
+wire        cfg_waitrequest;
+reg         cfg_write;
+reg   [5:0] cfg_address;
+reg  [31:0] cfg_data;
+
+pll_cfg pll_cfg
+(
+	.mgmt_clk(CLK_50M),
+	.mgmt_reset(0),
+	.mgmt_waitrequest(cfg_waitrequest),
+	.mgmt_read(0),
+	.mgmt_readdata(),
+	.mgmt_write(cfg_write),
+	.mgmt_address(cfg_address),
+	.mgmt_writedata(cfg_data),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll)
+);
+
+always @(posedge CLK_50M) begin
+	reg pald = 0, pald2 = 0;
+	reg [2:0] state = 0;
+	reg pal_r;
+
+	pald <= PAL;
+	pald2 <= pald;
+
+	cfg_write <= 0;
+	if(pald2 == pald && pald2 != pal_r) begin
+		state <= 1;
+		pal_r <= pald2;
+	end
+
+	if(!cfg_waitrequest) begin
+		if(state) state<=state+1'd1;
+		case(state)
+			1: begin
+					cfg_address <= 0;
+					cfg_data <= 0;
+					cfg_write <= 1;
+				end
+			5: begin
+					cfg_address <= 7;
+					cfg_data <= pal_r ? 2201376125 : 2537930535;
+					cfg_write <= 1;
+				end
+			7: begin
+					cfg_address <= 2;
+					cfg_data <= 0;
+					cfg_write <= 1;
+				end
+		endcase
+	end
+end
 
 wire reset = RESET | status[0] | buttons[1] | region_set;
 
@@ -970,17 +1083,12 @@ wire hs_c,vs_c,hblank_c,vblank_c;
 video_mixer #(.LINE_LENGTH(320), .HALF_DEPTH(0), .GAMMA(1)) video_mixer
 (
 	.*,
-
-	.clk_vid(CLK_VIDEO),
 	.ce_pix(~old_ce_pix & ce_pix),
-	.ce_pix_out(CE_PIXEL),
-
-	.scanlines(0),
 	.scandoubler(~interlace && (scale || forced_scandoubler)),
 	.hq2x(scale==1),
+	.freeze_sync(),
 
-	.mono(0),
-
+	.VGA_DE(vga_de),
 	.R((lg_target && gun_mode && (~&status[44:43])) ? {8{lg_target[0]}} : red),
 	.G((lg_target && gun_mode && (~&status[44:43])) ? {8{lg_target[1]}} : green),
 	.B((lg_target && gun_mode && (~&status[44:43])) ? {8{lg_target[2]}} : blue),
@@ -1036,44 +1144,6 @@ wire [3:0] hrgn = ioctl_data[3:0] - 4'd7;
 
 reg cart_hdr_ready = 0;
 reg hdr_j = 0, hdr_u = 0, hdr_e = 0;
-reg [24:0] rom_sz;
-reg s32x_rom = 0;
-always @(posedge clk_sys) begin
-	reg old_download;
-	old_download <= cart_download;
-
-	if(~old_download && cart_download) begin
-		{hdr_j,hdr_u,hdr_e} <= 0;
-		s32x_rom <= 1; //&ioctl_index[7:6];
-	end
-	
-	if(old_download && ~cart_download) begin
-		cart_hdr_ready <= 0;
-		rom_sz <= ioctl_addr[24:0];
-	end
-
-	if(ioctl_wr & cart_download) begin
-		if(ioctl_addr == 'h1F0) begin
-			if(ioctl_data[7:0] == "J") hdr_j <= 1;
-			else if(ioctl_data[7:0] == "U") hdr_u <= 1;
-			else if(ioctl_data[7:0] == "E") hdr_e <= 1;
-			else if(ioctl_data[7:0] >= "0" && ioctl_data[7:0] <= "9") {hdr_e, hdr_u, hdr_j} <= {ioctl_data[3], ioctl_data[2], ioctl_data[0]};
-			else if(ioctl_data[7:0] >= "A" && ioctl_data[7:0] <= "F") {hdr_e, hdr_u, hdr_j} <= {      hrgn[3],       hrgn[2],       hrgn[0]};
-		end
-		if(ioctl_addr == 'h1F2) begin
-			if(ioctl_data[7:0] == "J") hdr_j <= 1;
-			else if(ioctl_data[7:0] == "U") hdr_u <= 1;
-			else if(ioctl_data[7:0] == "E") hdr_e <= 1;
-		end
-		if(ioctl_addr == 'h1F0) begin
-			if(ioctl_data[15:8] == "J") hdr_j <= 1;
-			else if(ioctl_data[15:8] == "U") hdr_u <= 1;
-			else if(ioctl_data[15:8] == "E") hdr_e <= 1;
-		end
-		if(ioctl_addr == 'h200) cart_hdr_ready <= 1;
-	end
-end
-
 reg  [1:0] region_req;
 reg        region_set = 0;
 
@@ -1128,6 +1198,43 @@ always @(posedge clk_sys) begin
 	if(old_ready & ~cart_hdr_ready) region_set <= 0;
 end
 
+reg [24:0] rom_sz;
+reg s32x_rom = 0;
+always @(posedge clk_sys) begin
+	reg old_download;
+	old_download <= cart_download;
+
+	if(~old_download && cart_download) begin
+		{hdr_j,hdr_u,hdr_e} <= 0;
+		s32x_rom <= 1; //&ioctl_index[7:6];
+	end
+	
+	if(old_download && ~cart_download) begin
+		cart_hdr_ready <= 0;
+		rom_sz <= ioctl_addr[24:0];
+	end
+
+	if(ioctl_wr & cart_download) begin
+		if(ioctl_addr == 'h1F0) begin
+			if(ioctl_data[7:0] == "J") hdr_j <= 1;
+			else if(ioctl_data[7:0] == "U") hdr_u <= 1;
+			else if(ioctl_data[7:0] == "E") hdr_e <= 1;
+			else if(ioctl_data[7:0] >= "0" && ioctl_data[7:0] <= "9") {hdr_e, hdr_u, hdr_j} <= {ioctl_data[3], ioctl_data[2], ioctl_data[0]};
+			else if(ioctl_data[7:0] >= "A" && ioctl_data[7:0] <= "F") {hdr_e, hdr_u, hdr_j} <= {      hrgn[3],       hrgn[2],       hrgn[0]};
+		end
+		if(ioctl_addr == 'h1F2) begin
+			if(ioctl_data[7:0] == "J") hdr_j <= 1;
+			else if(ioctl_data[7:0] == "U") hdr_u <= 1;
+			else if(ioctl_data[7:0] == "E") hdr_e <= 1;
+		end
+		if(ioctl_addr == 'h1F0) begin
+			if(ioctl_data[15:8] == "J") hdr_j <= 1;
+			else if(ioctl_data[15:8] == "U") hdr_u <= 1;
+			else if(ioctl_data[15:8] == "E") hdr_e <= 1;
+		end
+		if(ioctl_addr == 'h200) cart_hdr_ready <= 1;
+	end
+end
 
 reg [2:0] eeprom_map = 0;
 reg bank_eeprom_quirk = 0;
