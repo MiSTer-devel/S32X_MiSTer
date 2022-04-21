@@ -1002,13 +1002,13 @@ always_comb begin
 		g = color_lut[GEN_G];
 		b = color_lut[GEN_B];
 	end else if (!VDP_MD_EN && VDP_32X_EN) begin
-		r = {S32X_R,S32X_R[0],S32X_R[0],S32X_R[0]};
-		g = {S32X_G,S32X_G[0],S32X_G[0],S32X_G[0]};
-		b = {S32X_B,S32X_B[0],S32X_B[0],S32X_B[0]};
+		r = {S32X_R,S32X_R[4:2]};
+		g = {S32X_G,S32X_G[4:2]};
+		b = {S32X_B,S32X_B[4:2]};
 	end else begin
-		r = !S32X_YSO_N ? {S32X_R,S32X_R[0],S32X_R[0],S32X_R[0]} : color_lut[GEN_R];
-		g = !S32X_YSO_N ? {S32X_G,S32X_G[0],S32X_G[0],S32X_G[0]} : color_lut[GEN_G];
-		b = !S32X_YSO_N ? {S32X_B,S32X_B[0],S32X_B[0],S32X_B[0]} : color_lut[GEN_B];
+		r = !S32X_YSO_N ? {S32X_R,S32X_R[4:2]} : color_lut[GEN_R];
+		g = !S32X_YSO_N ? {S32X_G,S32X_G[4:2]} : color_lut[GEN_G];
+		b = !S32X_YSO_N ? {S32X_B,S32X_B[4:2]} : color_lut[GEN_B];
 	end
 end
 

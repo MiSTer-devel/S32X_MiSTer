@@ -70,25 +70,26 @@ module S32X
 	output     [23:0] DBG_CA
 );
 	import S32X_PKG::*;
-	
+
+//53.693175
 	bit CE_R, CE_F;
 	always @(posedge CLK) begin
 		bit [2:0] CLK_CNT;
 		CLK_CNT <= CLK_CNT == 3'd6 ? 3'd0 : CLK_CNT + 3'd1;
 		
-//		CE_F <= 0;
-//		CE_R <= 0;
-//		case (CLK_CNT)
-//			3'd0: CE_F <= 1;
-//			3'd1: CE_R <= 1;
-//			3'd2: CE_F <= 1;
-//			3'd3: CE_R <= 1;
-//			3'd5: CE_F <= 1;
-//			3'd6: CE_R <= 1; 
-//			default:;
-//		endcase
-		CE_F <= ~CE_F;
-		CE_R <= CE_F;
+		CE_F <= 0;
+		CE_R <= 0;
+		case (CLK_CNT)
+			3'd0: CE_F <= 1;
+			3'd1: CE_R <= 1;
+			3'd2: CE_F <= 1;
+			3'd3: CE_R <= 1;
+			3'd5: CE_F <= 1;
+			3'd6: CE_R <= 1; 
+			default:;
+		endcase
+		// CE_F <= ~CE_F;
+		// CE_R <= CE_F;
 	end
 
 	bit  [26:0] SHA;
