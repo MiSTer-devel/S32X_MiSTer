@@ -71,25 +71,33 @@ module S32X
 );
 	import S32X_PKG::*;
 
-//53.693175
 	bit CE_R, CE_F;
+	// The SH2 clock ticks 3 full times for each VCLK
 	always @(posedge CLK) begin
-		bit [2:0] CLK_CNT;
-		CLK_CNT <= CLK_CNT == 3'd6 ? 3'd0 : CLK_CNT + 3'd1;
-		
+		bit [2:0] CLK_CNT = 3'b111;
+		if (~&CLK_CNT)
+			CLK_CNT <= CLK_CNT + 1'd1;
+
 		CE_F <= 0;
 		CE_R <= 0;
+	
+		if (VCLK) begin
+			CLK_CNT <= 1;
+			CE_F <= 1;
+		end
+
 		case (CLK_CNT)
 			3'd0: CE_F <= 1;
 			3'd1: CE_R <= 1;
 			3'd2: CE_F <= 1;
 			3'd3: CE_R <= 1;
-			3'd5: CE_F <= 1;
-			3'd6: CE_R <= 1; 
+			3'd4: CE_F <= 1;
+			3'd5: CE_R <= 1;
 			default:;
 		endcase
-		// CE_F <= ~CE_F;
-		// CE_R <= CE_F;
+
+		if (~RST_N)
+			CLK_CNT <= 3'b111;
 	end
 
 	bit  [26:0] SHA;
