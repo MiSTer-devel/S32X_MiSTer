@@ -228,7 +228,7 @@ module S32X_IF
 		bit        VDP_HINT_OLD;
 		bit        VDP_VINT_OLD;
 		bit [15:0] CYC_CNT_NEXT;
-		bit  [3:0] TIME_CNT_NEXT;
+		bit  [4:0] TIME_CNT_NEXT;
 		bit        LPWFIFO_INC_AMOUNT,LPWFIFO_DEC_AMOUNT;
 		bit        RPWFIFO_INC_AMOUNT,RPWFIFO_DEC_AMOUNT;
 		bit  [1:0] LPWFIFO_AMOUNT,RPWFIFO_AMOUNT;
@@ -407,10 +407,14 @@ module S32X_IF
 						end
 						6'h30: begin
 							if (!LWR_V) PWMCR[ 7:0] <= VDI_SYNC[ 7:0] & PWMCR_MASK[ 7:0];
+							TIME_CNT <= 0;
+							TIME_CNT_NEXT <= 5'd1;
 						end
 						6'h32: begin
 							if (!LWR_V) CYCR[ 7:0] <= VDI_SYNC[ 7:0] & CYCR_MASK[ 7:0];
 							if (!UWR_V) CYCR[11:8] <= VDI_SYNC[11:8] & CYCR_MASK[11:8];
+							CYC_CNT <= 0;
+							CYC_CNT_NEXT <= 12'd1;
 						end
 						6'h34: begin
 							if (!LWR_V) LPWR[ 7:0] <= VDI_SYNC[ 7:0] & PWR_MASK[ 7:0];
@@ -570,10 +574,14 @@ module S32X_IF
 						6'h30: begin
 							if (!SHDQMLL_N) PWMCR[ 7:0] <= SHDI[ 7:0] & PWMCR_MASK[ 7:0];
 							if (!SHDQMLU_N) PWMCR[15:8] <= SHDI[15:8] & PWMCR_MASK[15:8];
+							TIME_CNT <= 0;
+							TIME_CNT_NEXT <= 5'd1;
 						end
 						6'h32: begin
 							if (!SHDQMLL_N) CYCR[ 7:0] <= SHDI[ 7:0] & CYCR_MASK[ 7:0];
 							if (!SHDQMLU_N) CYCR[11:8] <= SHDI[11:8] & CYCR_MASK[11:8];
+							CYC_CNT <= 0;
+							CYC_CNT_NEXT <= 12'd1;
 						end
 						6'h34: begin
 							if (!SHDQMLL_N) LPWR[ 7:0] <= SHDI[ 7:0] & PWR_MASK[ 7:0];
@@ -681,21 +689,23 @@ module S32X_IF
 			
 			//PWM
 			if (PWMCR.LMD || PWMCR.RMD) begin 
-				CYC_CNT_NEXT = CYC_CNT + 12'd1;
-				TIME_CNT_NEXT = TIME_CNT + 4'd1;
+				CYC_CNT_NEXT <= CYC_CNT + 12'd1;
+				TIME_CNT_NEXT <= TIME_CNT + 4'd1;
 			end else begin 
-				CYC_CNT_NEXT = 12'd0;
+				CYC_CNT_NEXT <= 12'd0;
 				TIME_CNT <= 4'd0;
 			end
 			
 			if (CE_R) begin
 				PWM_OUT <= 0;
-				CYC_CNT <= CYC_CNT_NEXT;
-				if (CYC_CNT_NEXT == CYCR && (PWMCR.LMD || PWMCR.RMD)) begin
+				CYC_CNT <= CYC_CNT + 1'd1;
+				if ((CYCR != 0) && (CYC_CNT_NEXT == CYCR) && (PWMCR.LMD || PWMCR.RMD)) begin
 					CYC_CNT <= 12'd0;
-					TIME_CNT <= TIME_CNT_NEXT;
-					if (TIME_CNT_NEXT == PWMCR.TM) begin
+					CYC_CNT_NEXT <= 12'd1;
+					TIME_CNT <= TIME_CNT + 1'd1;
+					if (TIME_CNT_NEXT == (PWMCR.TM == 0 ? 4'd1 : PWMCR.TM)) begin
 						TIME_CNT <= 4'd0;
+						TIME_CNT_NEXT <= 4'd1;
 						PWM_INTM <= IMMR.PWM;
 						PWM_INTS <= IMSR.PWM;
 						PWM_REQ_PEND <= 1;
@@ -724,20 +734,20 @@ module S32X_IF
 				
 				if (LPWFIFO_INC_AMOUNT && !LPWFIFO_DEC_AMOUNT) begin
 					if (LPWFIFO_AMOUNT == 2'd2) LPWR.FULL <= 1;
-					else LPWFIFO_AMOUNT <= LPWFIFO_AMOUNT + 2'd1;
+					if (~&LPWFIFO_AMOUNT) LPWFIFO_AMOUNT <= LPWFIFO_AMOUNT + 2'd1;
 					LPWR.EMPTY <= 0;
 				end else if (!LPWFIFO_INC_AMOUNT && LPWFIFO_DEC_AMOUNT) begin
-					if (LPWFIFO_AMOUNT == 3'd0) LPWR.EMPTY <= 1;
-					else LPWFIFO_AMOUNT <= LPWFIFO_AMOUNT - 2'd1;
+					if (LPWFIFO_AMOUNT == 3'd1) LPWR.EMPTY <= 1;
+					if (|LPWFIFO_AMOUNT) LPWFIFO_AMOUNT <= LPWFIFO_AMOUNT - 2'd1;
 					LPWR.FULL <= 0;
 				end
 				if (RPWFIFO_INC_AMOUNT && !RPWFIFO_DEC_AMOUNT) begin
 					if (RPWFIFO_AMOUNT == 2'd2) RPWR.FULL <= 1;
-					else RPWFIFO_AMOUNT <= RPWFIFO_AMOUNT + 2'd1;
+					if (~&RPWFIFO_AMOUNT) RPWFIFO_AMOUNT <= RPWFIFO_AMOUNT + 2'd1;
 					RPWR.EMPTY <= 0;
 				end else if (!RPWFIFO_INC_AMOUNT && RPWFIFO_DEC_AMOUNT) begin
-					if (RPWFIFO_AMOUNT == 3'd0) RPWR.EMPTY <= 1;
-					else RPWFIFO_AMOUNT <= RPWFIFO_AMOUNT - 2'd1;
+					if (RPWFIFO_AMOUNT == 3'd1) RPWR.EMPTY <= 1;
+					if (|RPWFIFO_AMOUNT) RPWFIFO_AMOUNT <= RPWFIFO_AMOUNT - 2'd1;
 					RPWR.FULL <= 0;
 				end
 				
