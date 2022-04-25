@@ -5,7 +5,7 @@ by [Sergey Dvodnenko](https://github.com/srg320)
 
 ## Status
 * Most games are playable and run without major issues.
-* Some bugs present with audio playback (PWM sound plays too fast) and graphics.
+* Some bugs present with audio playback and graphics.
 * Some features like cheats and game saves are not implemented at this time. Please don't submit an issue to request cheats or saves, this is known.
 
 Check the issues page to see if the issue you are experiencing is already known before submitting a new issue.
