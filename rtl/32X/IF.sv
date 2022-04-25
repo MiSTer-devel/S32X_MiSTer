@@ -142,7 +142,7 @@ module S32X_IF
 	bit  [1:0] RPW_BUF_RDPOS,RPW_BUF_WRPOS;
 	bit [11:0] LPW_DATA;
 	bit [11:0] RPW_DATA;
-	bit        PWM_OUT;
+	bit [1:0]  PWM_OUT;
 	bit        LPW_SET;
 	bit        RPW_SET;
 	bit        PWM_REQ;
@@ -462,7 +462,7 @@ module S32X_IF
 						6'h32: MD_REG_DO <= {4'h0,CYCR[11:0]};
 						6'h34: MD_REG_DO <= {LPWR.FULL,LPWR.EMPTY,14'h0000};
 						6'h36: MD_REG_DO <= {RPWR.FULL,RPWR.EMPTY,14'h0000};
-						6'h38: MD_REG_DO <= {LPWR.FULL,LPWR.EMPTY,14'h0000};
+						6'h38: MD_REG_DO <= {RPWR.FULL,RPWR.EMPTY,14'h0000};
 						default: MD_REG_DO <= '0;
 					endcase
 					if ({VA_SYNC[5:1],1'b0} >= 6'h20 && {VA_SYNC[5:1],1'b0} <= 6'h21) MD_CP_READ <= 1;
@@ -697,7 +697,7 @@ module S32X_IF
 			end
 			
 			if (CE_R) begin
-				PWM_OUT <= 0;
+				PWM_OUT <= 2'b00;
 				CYC_CNT <= CYC_CNT + 1'd1;
 				if ((CYCR != 0) && (CYC_CNT_NEXT == CYCR) && (PWMCR.LMD || PWMCR.RMD)) begin
 					CYC_CNT <= 12'd0;
@@ -710,9 +710,9 @@ module S32X_IF
 						PWM_INTS <= IMSR.PWM;
 						PWM_REQ_PEND <= 1;
 					end
-					LPW_DATA <= LPW_BUF[LPW_BUF_RDPOS];
+					LPW_DATA <= PWMCR.MONO ?  RPW_BUF[RPW_BUF_RDPOS]: LPW_BUF[LPW_BUF_RDPOS];
 					RPW_DATA <= RPW_BUF[RPW_BUF_RDPOS];
-					PWM_OUT <= 1;
+					PWM_OUT <= PWMCR.MONO ? {!RPWR.EMPTY, !RPWR.EMPTY} : {!LPWR.EMPTY, !RPWR.EMPTY};
 					LPW_BUF_RDPOS <= LPW_BUF_RDPOS == 2'd2 ? 2'd0 : LPW_BUF_RDPOS + 2'd1;
 					RPW_BUF_RDPOS <= RPW_BUF_RDPOS == 2'd2 ? 2'd0 : RPW_BUF_RDPOS + 2'd1;
 					LPWFIFO_DEC_AMOUNT = 1;
@@ -778,14 +778,16 @@ module S32X_IF
 			else if (RPW_DATA > CYCR) TMPR = {1'b0,CYCR[11:1]};
 			else TMPR = RPW_DATA - {1'b0,CYCR[11:1]};
 			
-			if (PWM_OUT) begin
 			if (!CYCR[11]) begin
-				PWM_L <= {TMPL[11],TMPL[9:0],5'b00000};
-				PWM_R <= {TMPR[11],TMPR[9:0],5'b00000};
+				if (PWM_OUT[1])
+					PWM_L <= {TMPL[11],TMPL[9:0],5'b00000};
+				if (PWM_OUT[0])
+					PWM_R <= {TMPR[11],TMPR[9:0],5'b00000};
 			end else begin
-				PWM_L <= {TMPL,4'b0000};
-				PWM_R <= {TMPR,4'b0000};
-			end
+				if (PWM_OUT[1])
+					PWM_L <= {TMPL,4'b0000};
+				if (PWM_OUT[0])
+					PWM_R <= {TMPR,4'b0000};
 			end
 		end
 	end
