@@ -278,7 +278,7 @@ module S32X_VDP
 			if (!EDCLK_SYNC && EDCLK_OLD) begin
 				DOT_CLK <= ~DOT_CLK;
 				HSYNC_N_OLD <= HSYNC_N_SYNC;
-				if (!HSYNC_N_SYNC && HSYNC_N_OLD && H_CNT >= 9'h160) begin
+				if (!HSYNC_N_SYNC && HSYNC_N_OLD && (H_CNT >= 9'h160 || VSYNC_N_SYNC)) begin
 					H_CNT <= 9'h1CE;
 					DOT_CLK <= 1;
 				end else if (H_CNT == 9'h16C && DOT_CLK) begin
