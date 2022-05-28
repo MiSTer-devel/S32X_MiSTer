@@ -887,15 +887,15 @@ sdram sdram
 	.wrh0(cart_download ? ioctl_wait : use_sdr & S32X_SDR_CS & S32X_SDR_WE[1]),
 	.busy0(sdr_busy),
 
-	//CART ROM, CD PRAM
+	//CART ROM
 	.addr1(((CART_ROM_RD || CART_ROM_WRL || CART_ROM_WRH) && !s32x_rom) ? {1'b0,CART_ROM_A[23:1]} : 	//GEN CART ROM 0000000-0DFFFFF
 			 (!S32X_CCE0_N && s32x_rom)                                   ? {3'b000,S32X_CA[21:1]} :		//32X CART ROM 0000000-03FFFFF
 			 '0),
 	.din1(CART_ROM_DO),
 	.dout1(sdr_do1),
 	.rd1( (CART_ROM_RD  & ~s32x_rom) | (~S32X_CCE0_N & ~S32X_CCAS0_N & s32x_rom)),
-	.wrl1((CART_ROM_WRL & ~s32x_rom) | (~S32X_CCE0_N & ~S32X_CLWR_N & s32x_rom)),
-	.wrh1((CART_ROM_WRH & ~s32x_rom) | (~S32X_CCE0_N & ~S32X_CUWR_N & s32x_rom)),
+	.wrl1((CART_ROM_WRL & ~s32x_rom) /*| (~S32X_CCE0_N & ~S32X_CLWR_N & s32x_rom)*/),
+	.wrh1((CART_ROM_WRH & ~s32x_rom) /*| (~S32X_CCE0_N & ~S32X_CUWR_N & s32x_rom)*/),
 	.busy1(sdr_busy1),
 
 	//CART SRAM, Load/Save
