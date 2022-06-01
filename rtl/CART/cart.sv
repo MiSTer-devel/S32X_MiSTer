@@ -31,10 +31,9 @@ module CART
 	output            SRAM_WR,
 	
 	input      [23:0] rom_sz,
-	input       [2:0] eeprom_map,
-	input             bank_eeprom_quirk,
+	input             s32x,					//[3] EPPROM bank present, [2:0] 0:none,1:128B,2:128B,3:256B
+	input       [3:0] eeprom_map,
 	input             noram_quirk,
-	input             schan_quirk,
 	input             realtec_map,
 	input       [2:0] sf_map					//[2] SRAM bank present, [1:0] 0:none,1:SF-001,2:SF-002,3:SF-004
 );
@@ -82,7 +81,7 @@ module CART
 			end
 		end
 	end
-	wire ROM_LIN_EN = (rom_sz > 'h400000) & ~ROM_BANK_EN;	//Linear mapper
+	wire ROM_LIN_EN = (rom_sz > 'h400000) & ~ROM_BANK_EN & ~s32x;	//Linear mapper
 	wire [23:1] ROM_BANK_A = ROM_BANK_EN ? {ROM_BANK[VA[21:19]], VA[18:1]} : 
 	                         ROM_LIN_EN  ? VA[23:1] :
 	                         {2'b00,VA[21:1]};
@@ -103,28 +102,30 @@ module CART
 			EEPROM_BANK <= 0;
 			EEPROM_SDAI <= 1;
 			EEPROM_SCL <= 1;
-		end else if (eeprom_map || bank_eeprom_quirk) begin
-			if (VA[23:21] == 3'b001 && !CE0_N && !LWR_N && old_LWR_N /*&& !UWR_N && old_UWR_N*/) begin
-				EEPROM_BANK <= ~VDI[0] & bank_eeprom_quirk;
+		end else if (eeprom_map) begin
+			if (VA[23:21] == 3'b001 && !CE0_N && ((!LWR_N && old_LWR_N) || (!UWR_N && old_UWR_N))) begin
+				if (!LWR_N && !UWR_N) EEPROM_BANK <= ~VDI[0];
 				case (eeprom_map)
-					3'b001: {EEPROM_SDAI,EEPROM_SCL} <= VDI[7:6];
-					3'b010,
-					3'b011: {EEPROM_SCL,EEPROM_SDAI} <= VDI[1:0];
-					default: {EEPROM_SCL,EEPROM_SDAI} <= '1;
+					4'b0001: if (!LWR_N) {EEPROM_SDAI,EEPROM_SCL} <= VDI[7:6];
+					4'b0010,
+					4'b0011: if (!LWR_N) {EEPROM_SCL,EEPROM_SDAI} <= VDI[1:0];
+					4'b1011: if      (!LWR_N &&  UWR_N) EEPROM_SDAI <= VDI[0];
+					         else if ( LWR_N && !UWR_N) EEPROM_SCL <= VDI[8];
+					default: {EEPROM_SCL,EEPROM_SDAI} <= '1;//TODO 4'b1100-4'b1101
 				endcase
 			end
 		end
 	end
-	wire EEPROM_EN = (|eeprom_map || EEPROM_BANK) && VA[21] && !CE0_N;
-	wire [7:0] EEPROM_DO = {7{EEPROM_SDAO}};
+	wire EEPROM_EN = (|eeprom_map[2:0] && (EEPROM_BANK || !eeprom_map[3])) && VA[23:21] == 3'b001;
+	wire [15:0] EEPROM_DO = {16{EEPROM_SDAO & EEPROM_SDAI}};
 	
-	wire [1:0] EEPROM_MODE = eeprom_map <= 3'b010 ? 2'd0 : 2'd1;
-	wire [12:0] EEPROM_MASK = eeprom_map <= 3'b010 ? 13'h07F : 13'h0FF;
+	wire [1:0] EEPROM_MODE = eeprom_map[2:0] <= 3'b010 ? 2'd0 : 2'd1;
+	wire [12:0] EEPROM_MASK = eeprom_map[2:0] <= 3'b010 ? 13'h07F : 13'h0FF;
 	EPPROM_24CXX E24CXX
 	(
 		.clk(CLK),
 		.rst(~RST_N),
-		.en(EEPROM_EN),
+		.en(EEPROM_EN && !CE0_N),
 		
 		.mode(EEPROM_MODE),
 		.mask(EEPROM_MASK),
@@ -241,20 +242,18 @@ module CART
 						                      ROM_BANK_A;
 	assign ROM_DO = VDI;
 	assign ROM_RD = ROM_ACCESS & ~CAS0_N;
-	assign {ROM_WRH,ROM_WRL} = schan_quirk ? {ROM_ACCESS&~UWR_N,ROM_ACCESS&~LWR_N} : 2'b00;
+	assign {ROM_WRH,ROM_WRL} = {ROM_ACCESS&~UWR_N,ROM_ACCESS&~LWR_N};
 	
 	assign SRAM_A = realtec_map         ? VA[15:1] : 
 					    sf_map[1:0] == 2'd1 ? SF001_SRAM_A : 
 						 sf_map[1:0] == 2'd2 ? SF002_SRAM_A : 
 						 sf_map[1:0] == 2'd3 ? SF004_SRAM_A : 
-//						 bank_eeprom_quirk   ? EEPROM_SRAM_A :
-//						 eeprom_quirk        ? EEPROM_SRAM_A :
 						                       SRAM_BANK_A;
-	assign SRAM_DO = /*eeprom_quirk || bank_eeprom_quirk ? EEPROM_SRAM_D :*/ VDI[7:0];
-	assign SRAM_RD = /*eeprom_quirk || bank_eeprom_quirk ? ~EEPROM_SRAM_WE :*/ SRAM_ACCESS & ~CAS0_N;
-	assign SRAM_WR = /*eeprom_quirk || bank_eeprom_quirk ?  EEPROM_SRAM_WE :*/ SRAM_ACCESS & ~LWR_N;
+	assign SRAM_DO = VDI[7:0];
+	assign SRAM_RD = SRAM_ACCESS & ~CAS0_N;
+	assign SRAM_WR = SRAM_ACCESS & ~LWR_N;
 	
-	assign VDO = (eeprom_map || bank_eeprom_quirk) && VA[23:21] == 3'b001 ? EEPROM_DO : 
+	assign VDO = EEPROM_EN ? EEPROM_DO : 
 	             !TIME_N ? (sf_map[1:0] == 2'd3 ? SF004_DO : 16'h0000) :
 					 SRAM_ACCESS ? {8'hFF,SRAM_DI} : 
 					 ROM_ACCESS ? ROM_DI : 
