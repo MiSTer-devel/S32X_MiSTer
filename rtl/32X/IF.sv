@@ -841,7 +841,7 @@ module S32X_IF
 						S32X_UWR <= ~SHDQMLU_N;
 						S32X_CAS0 <= ~SHRD_N;
 						SH_ROM_GRANT <= 1;
-						ROM_ST <= RS_SH_RW;
+						ROM_ST <= RS_SH_WAIT;//RS_SH_RW;;
 					end else if (MD_ROM_WAIT && ADCR.ADEN && !DCR.RV) begin
 						S32X_CE0 <= 1;
 						ROM_ST <= RS_MD_RW;
@@ -856,14 +856,14 @@ module S32X_IF
 				end
 				
 				RS_SH_WAIT: begin
-					if (/*(ROM_WAIT_SYNC || !USE_ROM_WAIT) &&*/ CE_F) begin
+					if ((ROM_WAIT_SYNC || !USE_ROM_WAIT) && CE_F) begin
 						ROM_ST <= RS_SH_READ;
 					end
 				end
 				
 				RS_SH_READ: begin
-					if (!ROM_WAIT/*_SYNC*/ && CE_F) begin
-						SH_ROM_DO <= CDI/*_SYNC*/;
+					if (!ROM_WAIT_SYNC && CE_F) begin
+						SH_ROM_DO <= CDI_SYNC;
 						SH_ROM_WAIT <= 0;
 						S32X_LWR <= 0;
 						S32X_UWR <= 0;
