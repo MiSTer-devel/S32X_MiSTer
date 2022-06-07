@@ -303,7 +303,7 @@ localparam CONF_STR = {
 	"P3OV,Sprite Limit,Normal,High;",
 	"P3-;",
 
-	"-;",
+	"- ;",
 	"H3o0,Enable FM,Yes,No;",
 	"H3o1,Enable PSG,Yes,No;",
 	"H3-;",
