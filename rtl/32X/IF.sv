@@ -835,7 +835,7 @@ module S32X_IF
 			if (SH_ROM_WAIT) ROM_WAIT_CNT <= ROM_WAIT_CNT + 8'd1;
 			case (ROM_ST)
 				RS_IDLE: begin
-					if (SH_ROM_WAIT && !DCR.RV) begin
+					if (SH_ROM_WAIT && AS_N_SYNC[0] && !DCR.RV) begin
 						S32X_CE0 <= 1;
 						S32X_LWR <= ~SHDQMLL_N;
 						S32X_UWR <= ~SHDQMLU_N;

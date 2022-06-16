@@ -74,7 +74,7 @@ module SH7604_DIVU (
 			else if (STEP >= 6'd4 && STEP <= 6'd36) begin
 				R <= !SUM[64] ? SUM : R;
 				Q <= {Q[30:0],~SUM[64]};
-				D <= {D[63],D[63:1]};
+				D <= {D[64],D[64:1]};
 				
 				if (STEP == 6'd5 && OVF) STEP <= 6'd38;
 			end
