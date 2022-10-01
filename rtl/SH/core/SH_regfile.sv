@@ -15,8 +15,10 @@ module SH2_regfile (
 	output     [31:0] RA_Q,
 	input       [4:0] RB_ADDR,
 	output     [31:0] RB_Q,
-	output     [31:0] R0_Q,
-	
+	output     [31:0] R0_Q
+
+`ifdef DEBUG
+	                  ,
 	output     [31:0] R0,
 	output     [31:0] R1,
 	output     [31:0] R2,
@@ -34,6 +36,7 @@ module SH2_regfile (
 	output     [31:0] R14,
 	output     [31:0] R15,
 	output     [31:0] PR_
+`endif
 );
 	
 	// synopsys translate_off
@@ -157,7 +160,9 @@ module SH2_regfile (
 		end
 	end
 	assign R0_Q = GR0;
-	
+`endif
+
+`ifdef DEBUG
 	reg [31:0] DBG_GR[17];
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
@@ -190,7 +195,6 @@ module SH2_regfile (
 	assign R14 = DBG_GR[14];
 	assign R15 = DBG_GR[15];
 	assign PR_ = DBG_GR[16];
-	
 `endif
 	
 endmodule

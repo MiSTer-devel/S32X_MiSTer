@@ -33,8 +33,10 @@ module SH_core
 	output            VECT_REQ,
 	input             VECT_WAIT,
 	
-	output            SLEEP,
+	output            SLEEP
 	
+`ifdef DEBUG
+	                  ,
 	output			   ILI,
 	
 	input       [4:0] DBG_REGN,
@@ -43,6 +45,7 @@ module SH_core
 	output            DBG_BREAK/*,
 	
 	output			   REG_HOOK*/
+`endif
 );
 	
 	import SH2_PKG::*;
@@ -93,7 +96,11 @@ module SH_core
 	bit [31:0] REGS_WBD;
 	bit        REGS_WBE;
 	
+`ifdef DEBUG
 	assign REGS_RAN = EN ? ID_DECI.RA.N : DBG_REGN;
+`elsif
+	assign REGS_RAN = ID_DECI.RA.N;
+`endif
 	assign REGS_RBN = ID_DECI.RB.N;
 	
 	SH2_regfile regfile (CLK, RST_N, CE, EN, REGS_WAN, REGS_WAD, REGS_WAE, REGS_WBN, REGS_WBD, REGS_WBE, 
@@ -794,6 +801,7 @@ module SH_core
 	assign SLEEP = SLP;
 	
 	//Debug
+`ifdef DEBUG
 	assign ILI = ID_DECI.ILI & ~ID_STALL & ~IFID_STALL;
 	assign DBG_REGQ = DBG_REGN <= 5'h10 ? REGS_RAQ :
 	                  DBG_REGN == 5'h11 ? SR :
@@ -816,5 +824,6 @@ module SH_core
 			end
 		end
 	end
-	
+`endif
+
 endmodule
