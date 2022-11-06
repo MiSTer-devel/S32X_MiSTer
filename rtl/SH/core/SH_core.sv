@@ -516,7 +516,7 @@ module SH_core
 		adder_code = PIPE.EX.DI.ALU.OP == DIV ? {1'b0,SR.M~^SR.Q} : PIPE.EX.DI.ALU.CD;
 		adder_cmp = PIPE.EX.DI.ALU.CMP;
 		{ADDER_C,ADDER_RES} = Adder(adder_a,ALU_B,SR.T,adder_code);
-		ADDER_V = (ALU_A[31] & (ALU_B[31] ^ adder_cmp[0]) & ~ADDER_RES[31]) | (~ALU_A[31] & ~(ALU_B[31] ^ adder_cmp[0]) & ADDER_RES[31]);
+		ADDER_V = ~((ALU_A[31] ^ ALU_B[31]) ^ adder_code[0]) & (ALU_A[31] ^ ADDER_RES[31]);
 		ge_hs = (~ALU_A[31] & ~ALU_B[31] & ~ADDER_RES[31]) | (ALU_A[31] & ALU_B[31] & ~ADDER_RES[31]) | ((adder_cmp[0] ^ ALU_A[31]) & (~adder_cmp[0] ^ ALU_B[31]));
 		eq = ~|ADDER_RES[31:0];
 		
