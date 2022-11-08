@@ -44,24 +44,12 @@ module SH7604_FRT (
 	TOCR_t      TOCR;
 	
 	//Clock selector
-	bit         FRC_CE;
 	bit         FTCI_OLD;
-	always @(posedge CLK or negedge RST_N) begin
-		if (!RST_N) begin
-//			FRC_CE <= 0;
-			FTCI_OLD <= 0;
-		end
-		else if (EN && CE_R) begin
-			FTCI_OLD <= FTCI;
-//			case (TCR.CKS)
-//				2'b00: FRC_CE <= CLK8_CE;
-//				2'b01: FRC_CE <= CLK32_CE;
-//				2'b10: FRC_CE <= CLK128_CE;
-//				2'b11: FRC_CE <= FTCI & ~FTCI_OLD;
-//			endcase
-		end
+	always @(posedge CLK) begin
+		FTCI_OLD <= FTCI;
 	end
 	
+	bit         FRC_CE;
 	always_comb begin
 		case (TCR.CKS)
 			2'b00: FRC_CE = CLK8_CE;
@@ -73,7 +61,6 @@ module SH7604_FRT (
 	
 	wire REG_SEL = (IBUS_A >= 32'hFFFFFE10 && IBUS_A <= 32'hFFFFFE19);
 	wire FTCSR_WRITE = REG_SEL && IBUS_A[3:0] == 4'h1 && IBUS_WE && IBUS_REQ;
-//	wire FTCSR_READ = REG_SEL && IBUS_A[3:0] == 4'h1 && !IBUS_WE && IBUS_REQ;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			FTCSR.OCFA <= 0;
@@ -102,9 +89,9 @@ module SH7604_FRT (
 				end
 				
 				if (FTCSR_WRITE) begin
-					if (!IBUS_DI[19] && FTCSR.OCFA) FTCSR.OCFA <= 0;
-					if (!IBUS_DI[18] && FTCSR.OCFB) FTCSR.OCFB <= 0;
-					if (!IBUS_DI[17] && FTCSR.OVF) FTCSR.OVF <= 0;
+					if (!IBUS_DI[19] && FTCSR_READED[3] && FTCSR.OCFA) FTCSR.OCFA <= 0;
+					if (!IBUS_DI[18] && FTCSR_READED[2] && FTCSR.OCFB) FTCSR.OCFB <= 0;
+					if (!IBUS_DI[17] && FTCSR_READED[1] && FTCSR.OVF) FTCSR.OVF <= 0;
 				end
 			end
 		end
@@ -144,7 +131,7 @@ module SH7604_FRT (
 				end
 				
 				if (FTCSR_WRITE) begin
-					if (!IBUS_DI[23] && FTCSR.ICF) FTCSR.ICF <= 0;
+					if (!IBUS_DI[23] && FTCSR_READED[7] && FTCSR.ICF) FTCSR.ICF <= 0;
 				end
 			end
 		end
@@ -169,9 +156,8 @@ module SH7604_FRT (
 			FTCSR.CCLRA <= 0;
 			FTCSR.UNUSED <= '0;
 			// synopsys translate_off
-			
-			// synopsys translate_on
 			TEMP <= 8'h00;
+			// synopsys translate_on
 		end
 		else if (CE_R) begin
 			if (FRC_CE) begin
@@ -210,6 +196,7 @@ module SH7604_FRT (
 	end
 	
 	bit [31:0] REG_DO;
+	bit [7 :0] FTCSR_READED;
 	always @(posedge CLK or negedge RST_N) begin
 		bit [7:0] TEMP;
 		bit [31:0] OCR;
@@ -222,7 +209,7 @@ module SH7604_FRT (
 				OCR = !TOCR.OCRS ? OCRA : OCRB;
 				case (IBUS_A[3:0])
 					4'h0:       REG_DO <= {4{TIER & TIER_RMASK}};
-					4'h1:       REG_DO <= {4{FTCSR & FTCSR_RMASK}};
+					4'h1: begin REG_DO <= {4{FTCSR & FTCSR_RMASK}}; FTCSR_READED <= FTCSR; end
 					4'h2: begin REG_DO <= {4{FRC[15:8]}}; 
 					            TEMP   <= FRC[7:0]; end
 					4'h3:       REG_DO <= {4{TEMP}};

@@ -145,7 +145,7 @@ package SH2_PKG;
 		bit          TAS;		//TAS instruction
 		bit          SLP;		//SLEEP instruction
 		bit [2:0]    LST;		//Last state
-		bit          IACK;	//Interrupt acknowledge
+		bit          IACP;	//Interrupt accepted
 		bit          VECR;
 		bit          ILI;		//Illegal instruction
 	} DecInstr_t;
@@ -1118,7 +1118,7 @@ package SH2_PKG;
 						case (STATE)
 							3'd0: begin
 //								DECI.CTRL = '{1, SR_, IMSK};
-//								DECI.IACK = 1;
+//								DECI.IACP = 1;
 							end
 							3'd1: begin
 								DECI.DP.RSC = RSC_IMM;
@@ -1163,7 +1163,7 @@ package SH2_PKG;
 					4'b0001:	begin	//Interrupt Exeption
 						case (STATE)
 							3'd0: begin
-								DECI.IACK = 1;
+								DECI.IACP = 1;
 							end
 							3'd1: begin
 								DECI.RA = '{SP, 1, 1};
@@ -1215,7 +1215,7 @@ package SH2_PKG;
 					4'b0010:	begin	//Illegal Slot/Instruction Exeption
 						case (STATE)
 							3'd0: begin
-								DECI.IACK = 1;
+								DECI.IACP = 1;
 							end
 							3'd1: begin
 								DECI.RA = '{SP, 1, 1};
