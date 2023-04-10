@@ -195,6 +195,18 @@ module SH7604 (
 	bit        CLK4096_CE;
 	bit        CLK8192_CE;
 	
+	bit        RES_SYNC_N;
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			RES_SYNC_N <= 0;
+		end
+		else begin	
+			if (CE_R) begin
+				RES_SYNC_N <= RES_N;
+			end
+		end
+	end
+
 	SH_core core
 	(
 		.CLK(CLK),
@@ -202,7 +214,7 @@ module SH7604 (
 		.CE(CE_R),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		.NMI_N(NMI_N),
 		
 		.BUS_A(CBUS_A),
@@ -249,7 +261,7 @@ module SH7604 (
 		.CE_F(CE_F),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		
 		.CBUS_A(CBUS_A),
 		.CBUS_DI(MULT_DI),
@@ -269,12 +281,12 @@ module SH7604 (
 	SH7604_CACHE cache
 	(
 		.CLK(CLK),
-		.RST_N(RST_N & RES_N),
+		.RST_N(RST_N),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		
 		.CBUS_A(CBUS_A),
 		.CBUS_DI(CACHE_DI),
@@ -317,7 +329,7 @@ module SH7604 (
 		.CE_F(CE_F),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		
 		.IBUS_A(IBUS_A),
 		.IBUS_DI(IBUS_DO),
@@ -346,7 +358,7 @@ module SH7604 (
 		.CE_F(CE_F),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		.NMI_N(NMI_N),
 		
 		.DREQ0(DREQ0),
@@ -409,7 +421,7 @@ module SH7604 (
 		.CE_F(CE_F),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		
 		.A(IA),
 		.DI(IDI),
@@ -467,7 +479,7 @@ module SH7604 (
 		.CE_F(CE_F),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		.NMI_N(NMI_N),
 		.IRL_N(IRL_N),
 		
@@ -520,7 +532,7 @@ module SH7604 (
 		.CE_F(CE_F),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		
 		.IBUS_A(IBUS_A),
 		.IBUS_DI(IBUS_DO),
@@ -580,7 +592,7 @@ module SH7604 (
 		.CE_F(CE_F),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		
 		.RXD(RXD),
 		.TXD(TXD),
@@ -615,7 +627,7 @@ module SH7604 (
 		.CE_F(CE_F),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		.SBY(SBY),
 		
 		.FTOA(FTOA),
@@ -650,7 +662,7 @@ module SH7604 (
 		.CE_F(CE_F),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		.SBY(SBY),
 		
 		.WDTOVF_N(WDTOVF_N),
@@ -686,7 +698,7 @@ module SH7604 (
 		.CE_F(CE_F),
 		.EN(EN),
 		
-		.RES_N(RES_N),
+		.RES_N(RES_SYNC_N),
 		
 		.IBUS_A(DBUS_A),
 		.IBUS_DI(DBUS_DO),

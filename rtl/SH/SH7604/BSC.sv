@@ -533,11 +533,6 @@ module SH7604_BSC
 			BGR <= 0;
 			MST_BUS_RLS <= 0;
 			SLV_BUS_RLS <= 1;
-		end else if (!RES_N) begin
-			BREQ <= 0;
-			BGR <= 0;
-			MST_BUS_RLS <= 0;
-			SLV_BUS_RLS <= 1;
 		end else if (CE_F) begin
 			if (MASTER) begin
 				if (BRLS && !BGR  && (BUS_STATE == T0 || BUS_STATE == T2 || BUS_STATE == TD || BUS_STATE == TV2) && !BUSY && !IBUS_LOCK && !MST_BUS_RLS) begin

@@ -432,6 +432,11 @@ module SH7604_CACHE (
 			IBUS_READARRAY <= 0;
 			IBUS_READ_PEND <= 0;
 		end
+		else if (EN && CE_R) begin
+			if (!RES_N) begin
+				IBUS_WRITE_PEND <= 0;
+			end
+		end
 		else if (EN && CE_F) begin
 			CACHE_UPDATE <= 0;
 			CACHE_WRITE <= 0;
