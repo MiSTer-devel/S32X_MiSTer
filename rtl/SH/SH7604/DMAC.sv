@@ -141,8 +141,41 @@ module SH7604_DMAC (
 		end
 	end
 	
-
+	
+	bit         DMA_REQ;
+	bit         DMA_REQ_CLR;
 	bit         DMA_CH;
+	bit         RB_PRIO;
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			DMA_REQ <= 0;
+			DMA_CH <= 0;
+			RB_PRIO <= 0;
+		end
+		else if (CE_R) begin
+			if (!DMA_REQ) begin
+				if ((CH_REQ[0] && CH_EN[0] && CH_AVAIL[0]) && 
+				    (CH_REQ[1] && CH_EN[1] && CH_AVAIL[1])) begin
+					DMA_REQ <= 1;
+					DMA_CH <= /*DMAOR.PR &*/ RB_PRIO;
+				end
+				else if (CH_REQ[0] && CH_EN[0] && CH_AVAIL[0]) begin
+					DMA_REQ <= 1;
+					DMA_CH <= 0;
+				end
+				else if (CH_REQ[1] && CH_EN[1] && CH_AVAIL[1]) begin
+					DMA_REQ <= 1;
+					DMA_CH <= 1;
+				end
+			end
+			else if (DMA_REQ_CLR) begin
+				DMA_REQ <= 0;
+				RB_PRIO <= ~RB_PRIO;
+			end
+		end
+	end
+	
+
 	bit         DMA_WR;
 	bit         DMA_RD;
 	bit         DMA_BURST;
@@ -151,26 +184,26 @@ module SH7604_DMAC (
 	bit   [1:0] LW_CNT;
 	bit   [1:0] SA_BA;
 	always @(posedge CLK or negedge RST_N) begin
-		bit         DMA_REQ;
-		bit         PRIO;
 		bit  [31:0] AR_INC;
 		bit  [23:0] TCR_NEXT;
 		bit         RD_BUF_LATCH;
 		
 		if (!RST_N) begin
-			SAR <= '{2{SARx_INIT}};
-			DAR <= '{2{DARx_INIT}};
-			TCR <= '{2{TCRx_INIT}};
-			CHCR <= '{2{CHCRx_INIT}};
+			SAR[0] <= SARx_INIT;
+			SAR[1] <= SARx_INIT;
+			DAR[0] <= DARx_INIT;
+			DAR[1] <= DARx_INIT;
+			TCR[0] <= TCRx_INIT;
+			TCR[1] <= TCRx_INIT;
+			CHCR[0] <= CHCRx_INIT;
+			CHCR[1] <= CHCRx_INIT;
 			
-			DMA_REQ <= 0;
-			DMA_CH <= 0;
-			PRIO <= 0;
 			DMA_WR <= 0;
 			DMA_RD <= 0;
 			DMA_BURST <= 0;
 			DMA_LOCK <= 0;
-			CH_REQ_CLR <= '{2{0}};
+			CH_REQ_CLR <= '{0,0};
+			DMA_REQ_CLR <= 0;
 			LW_CNT <= '0;
 			RD_BUF_LATCH <= 0;
 		end
@@ -180,25 +213,7 @@ module SH7604_DMAC (
 			
 			CH_REQ_CLR[0] <= 0;
 			CH_REQ_CLR[1] <= 0;
-			if (CE_R) begin
-				if (!DMA_REQ) begin
-					if ((CH_REQ[0] && CH_EN[0] && CH_AVAIL[0]) && 
-						 (CH_REQ[1] && CH_EN[1] && CH_AVAIL[1])) begin
-						DMA_REQ <= 1;
-						DMA_CH <= /*DMAOR.PR &*/ PRIO;
-						PRIO <= ~PRIO;
-					end
-					else if (CH_REQ[0] && CH_EN[0] && CH_AVAIL[0]) begin
-						DMA_REQ <= 1;
-						DMA_CH <= 0;
-					end
-					else if (CH_REQ[1] && CH_EN[1] && CH_AVAIL[1]) begin
-						DMA_REQ <= 1;
-						DMA_CH <= 1;
-					end
-				end
-			end
-			
+			DMA_REQ_CLR <= 0;
 			if (DMA_REQ && !DMA_RD && !DMA_WR && !DBUS_WAIT && !IBUS_LOCK && CE_F) begin
 				if (!CHCR[DMA_CH].TA || (CHCR[DMA_CH].TA && !CHCR[DMA_CH].AM)) begin
 					DMA_RD <= 1;
@@ -230,7 +245,7 @@ module SH7604_DMAC (
 					end
 					else if (CHCR[DMA_CH].TA && !CHCR[DMA_CH].AM && !LW_CNT) begin
 						CH_REQ_CLR[DMA_CH] <= 1;
-						DMA_REQ <= 0;
+						DMA_REQ_CLR <= 1;
 						LW_CNT <= &CHCR[DMA_CH].TS ? 2'd3 : 2'd0;
 						
 						if (!CHCR[DMA_CH].TB) DMA_RD <= 0;
@@ -264,7 +279,7 @@ module SH7604_DMAC (
 						
 						if (!CHCR[DMA_CH].TB) DMA_WR <= 0;
 					end
-					if (!LW_CNT) DMA_REQ <= 0;
+					if (!LW_CNT) DMA_REQ_CLR <= 1;
 					
 					TCR[DMA_CH] <= TCR_NEXT;
 					if (!TCR_NEXT) begin

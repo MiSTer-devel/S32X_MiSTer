@@ -172,6 +172,7 @@ module SH7604_BSC
 			RD_WR_N <= 1;
 			RD_N <= 1;
 			WE_N <= 4'b1111;
+			IVECF_N <= 1;
 			CACK <= 0;
 			DBUSY <= 0;
 			VBUSY <= 0;
