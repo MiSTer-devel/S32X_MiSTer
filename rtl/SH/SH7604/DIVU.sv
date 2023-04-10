@@ -166,10 +166,10 @@ module SH7604_DIVU (
 		if (!RST_N) begin
 			BUSY <= 0;
 		end
-		else if (EN && CE_R) begin
-			if (REG_SEL && IBUS_REQ && STEP < 6'd38 && !BUSY) begin
+		else if (EN && CE_F) begin
+			if (REG_SEL && IBUS_REQ && OPERATE && !BUSY) begin
 				BUSY <= 1;
-			end else if (STEP == 6'd38 && BUSY) begin
+			end else if (!OPERATE && BUSY) begin
 				BUSY <= 0;
 			end
 		end
