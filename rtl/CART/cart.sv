@@ -241,7 +241,7 @@ module CART
 						sf_map[1:0] == 2'd3 ? SF004_ROM_A : 
 						                      ROM_BANK_A;
 	assign ROM_DO = VDI;
-	assign ROM_RD = ROM_ACCESS & ~CAS0_N;
+	assign ROM_RD = ROM_ACCESS & ~SRAM_ACCESS & ~CAS0_N;
 	assign {ROM_WRH,ROM_WRL} = {ROM_ACCESS&~UWR_N,ROM_ACCESS&~LWR_N};
 	
 	assign SRAM_A = realtec_map         ? VA[15:1] : 

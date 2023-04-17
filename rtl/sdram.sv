@@ -40,27 +40,31 @@ module sdram
 
 	input      [24:1] addr0,
 	input             rd0,
-	input             wrl0,
-	input             wrh0,
+	input      [ 1:0] wr0,
 	input      [15:0] din0,
 	output reg [15:0] dout0,
 	output            busy0,
 	
 	input      [24:1] addr1,
 	input             rd1,
-	input             wrl1,
-	input             wrh1,
+	input      [ 1:0] wr1,
 	input      [15:0] din1,
 	output reg [15:0] dout1,
 	output            busy1,
 	
 	input      [24:1] addr2,
 	input             rd2,
-	input             wrl2,
-	input             wrh2,
+	input      [ 1:0] wr2,
 	input      [15:0] din2,
 	output reg [15:0] dout2,
-	output            busy2
+	output            busy2,
+	
+	input      [24:1] addr3,
+	input             rd3,
+	input      [ 1:0] wr3,
+	input      [15:0] din3,
+	output reg [15:0] dout3,
+	output            busy3
 );
 
 assign SDRAM_nCS = 0;
@@ -89,24 +93,23 @@ reg        we;
 reg  [1:0] ba = 0;
 reg  [1:0] dqm;
 reg        active = 0;
-reg  [2:0] ram_req = 0;
-reg  [2:0] ram_pend = 0;
-reg  [1:0] ram_n = 0;
+reg  [3:0] ch_req = 0;
+reg  [3:0] ch_pend = 0;
+reg  [1:0] ch_n = 0;
 
-wire [2:0] wr = {wrl2|wrh2,wrl1|wrh1,wrl0|wrh0};
-wire [2:0] rd = {rd2,rd1,rd0};
+wire [3:0] wr = {|wr3,|wr2,|wr1,|wr0};
+wire [3:0] rd = {rd3,rd2,rd1,rd0};
 
-
-//assign dout0 = dout;
-//assign dout1 = dout;
-//assign dout2 = dout;
+reg [24:1] ch_addr[4] = '{4{'1}};
+reg [15:0] ch_din[4];
+reg  [1:0] ch_wr[4];
 
 localparam [9:0] RFS_CNT = 766;
 
 // access manager
 always @(posedge clk) begin
 	reg  [9:0] rfs_timer = 0;
-	reg  [2:0] old_rd, old_wr;
+	reg  [3:0] old_rd, old_wr;
 	reg [15:0] dout;
 	reg        data_out = 0;
 
@@ -115,9 +118,10 @@ always @(posedge clk) begin
 
 	if(rfs_timer) rfs_timer <= rfs_timer - 1'd1;
 	
-	if ((~old_rd[0] && rd[0]) || (~old_wr[0] && wr[0])) begin ram_req[0] <= 1; ram_pend[0] <= 1; end
-	else if ((~old_rd[1] && rd[1]) || (~old_wr[1] && wr[1])) begin ram_req[1] <= 1; ram_pend[1] <= 1; end
-	else if ((~old_rd[2] && rd[2]) || (~old_wr[2] && wr[2])) begin ram_req[2] <= 1; ram_pend[2] <= 1; end
+	if ((~old_rd[0] && rd[0]) || (~old_wr[0] && wr[0])) begin ch_req[0] <= 1; ch_pend[0] <= 1; ch_addr[0] <= addr0; ch_din[0] <= din0; ch_wr[0] <= wr0; end
+	if ((~old_rd[1] && rd[1]) || (~old_wr[1] && wr[1])) begin ch_req[1] <= 1; ch_pend[1] <= 1; ch_addr[1] <= addr1; ch_din[1] <= din1; ch_wr[1] <= wr1; end
+	if ((~old_rd[2] && rd[2]) || (~old_wr[2] && wr[2])) begin ch_req[2] <= 1; ch_pend[2] <= 1; ch_addr[2] <= addr2; ch_din[2] <= din2; ch_wr[2] <= wr2; end
+	if ((~old_rd[3] && rd[3]) || (~old_wr[3] && wr[3])) begin ch_req[3] <= 1; ch_pend[3] <= 1; ch_addr[3] <= addr3; ch_din[3] <= din3; ch_wr[3] <= wr3; end
 
 	if(state == STATE_IDLE && mode == MODE_NORMAL) begin
 		if (!rfs_timer) begin
@@ -127,41 +131,53 @@ always @(posedge clk) begin
 			dqm <= 0;
 			state <= STATE_START;
 		end
-		else if ((~old_rd[0] && rd[0]) || (~old_wr[0] && wr[0]) || ram_pend[0]) begin
+		else if (ch_pend[0]) begin
 			old_rd[0] <= rd[0];
 			old_wr[0] <= wr[0];
-			{ba, a} <= addr0;
-			data <= din0;
-			we <= wr[0];
-			dqm <= wr[0] ? ~{wrh0,wrl0} : 2'b00;
+			{ba, a} <= ch_addr[0];
+			data <= ch_din[0];
+			we <= |ch_wr[0];
+			dqm <= ch_wr[0] ? ~ch_wr[0] : 2'b00;
 			active <= 1;
 			state <= STATE_START;
-			ram_pend[0] <= 0;
-			ram_n <= 0; 
+			ch_pend[0] <= 0;
+			ch_n <= 0; 
 		end
-		else if ((~old_rd[1] && rd[1]) || (~old_wr[1] && wr[1]) || ram_pend[1]) begin
+		else if (ch_pend[1]) begin
 			old_rd[1] <= rd[1];
 			old_wr[1] <= wr[1];
-			{ba, a} <= addr1;
-			data <= din1;
-			we <= wr[1];
-			dqm <= wr[1] ? ~{wrh1,wrl1} : 2'b00;
+			{ba, a} <= ch_addr[1];
+			data <= ch_din[1];
+			we <= |ch_wr[1];
+			dqm <= ch_wr[1] ? ~ch_wr[1] : 2'b00;
 			active <= 1;
 			state <= STATE_START;
-			ram_pend[1] <= 0;
-			ram_n <= 1; 
+			ch_pend[1] <= 0;
+			ch_n <= 1; 
 		end
-		else if ((~old_rd[2] && rd[2]) || (~old_wr[2] && wr[2]) || ram_pend[2]) begin
+		else if (ch_pend[2]) begin
 			old_rd[2] <= rd[2];
 			old_wr[2] <= wr[2];
-			{ba, a} <= addr2;
-			data <= din2;
-			we <= wr[2];
-			dqm <= wr[2] ? ~{wrh2,wrl2} : 2'b00;
+			{ba, a} <= ch_addr[2];
+			data <= ch_din[2];
+			we <= |ch_wr[2];
+			dqm <= ch_wr[2] ? ~ch_wr[2] : 2'b00;
 			active <= 1;
 			state <= STATE_START;
-			ram_pend[2] <= 0;
-			ram_n <= 2; 
+			ch_pend[2] <= 0;
+			ch_n <= 2; 
+		end
+		else if (ch_pend[3]) begin
+			old_rd[3] <= rd[3];
+			old_wr[3] <= wr[3];
+			{ba, a} <= ch_addr[3];
+			data <= ch_din[3];
+			we <= |ch_wr[3];
+			dqm <= ch_wr[3] ? ~ch_wr[3] : 2'b00;
+			active <= 1;
+			state <= STATE_START;
+			ch_pend[3] <= 0;
+			ch_n <= 3; 
 		end
 	end
 
@@ -178,18 +194,19 @@ always @(posedge clk) begin
 	end
 	
 	if (data_out) begin
-		case (ram_n) 
-			2'd0: begin dout0 <= dout; ram_req[0] <= 0; end
-			2'd1: begin dout1 <= dout; ram_req[1] <= 0; end
-			2'd2: begin dout2 <= dout; ram_req[2] <= 0; end
-			default:;
+		case (ch_n) 
+			2'd0: begin dout0 <= dout; ch_req[0] <= 0; end
+			2'd1: begin dout1 <= dout; ch_req[1] <= 0; end
+			2'd2: begin dout2 <= dout; ch_req[2] <= 0; end
+			2'd3: begin dout3 <= dout; ch_req[3] <= 0; end
 		endcase
 	end
 end
 
-assign busy0 = ram_req[0];
-assign busy1 = ram_req[1];
-assign busy2 = ram_req[2];
+assign busy0 = ch_req[0];
+assign busy1 = ch_req[1];
+assign busy2 = ch_req[2];
+assign busy3 = ch_req[3];
 
 
 localparam MODE_NORMAL = 2'b00;
