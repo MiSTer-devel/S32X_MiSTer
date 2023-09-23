@@ -182,7 +182,7 @@ assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
-assign LED_USER  = cart_download | sav_pending;
+assign LED_USER  = rom_download | sav_pending;
 
 assign VGA_SCALER= 0;
 assign VGA_DISABLE = 0;
@@ -249,7 +249,7 @@ video_freak video_freak
 `include "build_id.v"
 localparam CONF_STR = {
 	"S32X;;",
-	"F1,32X;",
+	"FS,32X;",
 	"-;",
 	"O67,Region,JP,US,EU;",
 	"O9,Auto Region,Header,Disabled;",
@@ -259,11 +259,11 @@ localparam CONF_STR = {
 	"C,Cheats;",
 	"H1OO,Cheats Enabled,Yes,No;",
 	"-;",
+	*/
 	"D0RG,Load Backup RAM;",
 	"D0RH,Save Backup RAM;",
 	"D0OD,Autosave,Off,On;",
 	"-;",
-	*/
 
 	"P1,Audio & Video;",
 	"P1-;",
@@ -398,7 +398,7 @@ wire [1:0] gun_mode = status[41:40];
 wire       gun_btn_mode = status[42];
 
 wire code_index = &ioctl_index;
-wire cart_download = ioctl_download & ~code_index;
+wire rom_download = ioctl_download & ~code_index;
 wire code_download = ioctl_download & code_index;
 
 reg osd_btn = 0;
@@ -410,7 +410,7 @@ always @(posedge clk_sys) begin
 	if (RESET) last_rst = 0;
 	if (status[0]) last_rst = 1;
 
-	if (cart_download & ioctl_wr & status[0]) has_bootrom <= 1;
+	if (rom_download & ioctl_wr & status[0]) has_bootrom <= 1;
 
 	if(last_rst & ~status[0]) begin
 		osd_btn <= 0;
@@ -587,7 +587,7 @@ gen gen
 	.CAS0_N(GEN_CAS0_N),
 	.TIME_N(GEN_TIME_N),
 
-	.LOADING(cart_download),
+	.LOADING(rom_download),
 	.EXPORT(|status[7:6]),
 	.PAL(PAL),
 
@@ -660,8 +660,8 @@ gen gen
 );
 
 assign GEN_MEM_BUSY = !GEN_RAS2_N                  ? 1'b0 : 
-                      CART_SRAM_RD || CART_SRAM_WR ? sdr_busy2 : 
-							                                sdr_busy1;
+                      CART_SRAM_RD || CART_SRAM_WR ? sdr_busy[2] : 
+							                                sdr_busy[1];
 
 assign GEN_VDI = s32x_rom ? S32X_VDO : CART_VDO;
 assign GEN_DTACK_N = S32X_DTACK_N & CART_DTACK_N;
@@ -715,7 +715,7 @@ S32X #(
 	.USE_ASYNC_FB(0)
 ) S32X
 (
-	.RST_N(~(reset | cart_download)),
+	.RST_N(~(reset | rom_download)),
 	.CLK(clk_sys),
 
 	.VCLK(GEN_VCLK_CE),
@@ -779,7 +779,7 @@ S32X #(
 	.PWM_R(S32X_SR)
 );
 assign S32X_CDI = CART_VDO;
-assign S32X_ROM_WAIT = CART_SRAM_RD || CART_SRAM_WR ? sdr_busy2 : sdr_busy1;
+assign S32X_ROM_WAIT = CART_SRAM_RD || CART_SRAM_WR ? sdr_busy[2] : sdr_busy[1];
 
 
 //Cart
@@ -793,7 +793,7 @@ wire        CART_ROM_WRL;
 wire        CART_ROM_WRH;
 wire        CART_ROM_RD;
 
-wire [14:0] CART_SRAM_A;
+wire [15:1] CART_SRAM_A;
 wire  [7:0] CART_SRAM_DI;
 wire  [7:0] CART_SRAM_DO;
 wire        CART_SRAM_WR;
@@ -801,7 +801,7 @@ wire        CART_SRAM_RD;
 CART cart
 (
 	.CLK(clk_sys),
-	.RST_N(~(reset || cart_download)),
+	.RST_N(~(reset || rom_download)),
 	
 	.VCLK(GEN_VCLK_CE),
 	.VA(!s32x_rom ? GEN_VA : S32X_CA),
@@ -837,15 +837,15 @@ CART cart
 	.realtec_map(realtec_map),
 	.sf_map(sf_map)
 );
-assign CART_ROM_DI = sdr_do1;
-assign CART_SRAM_DI = CART_SRAM_A[0] ? sdr_do2[7:0] : sdr_do2[15:8];
+assign CART_ROM_DI = sdr_do[1];
+assign CART_SRAM_DI = sdr_do[2][7:0];
 
 always @(posedge clk_sys) begin
 	reg old_busy;
 	
-	old_busy <= sdr_busy;
-	if(cart_download & ioctl_wr) ioctl_wait <= 1;
-	if(old_busy & ~sdr_busy) ioctl_wait <= 0;
+	old_busy <= sdr_busy[3];
+	if(rom_download & ioctl_wr) ioctl_wait <= 1;
+	if(old_busy & ~sdr_busy[3]) ioctl_wait <= 0;
 end
 
 reg use_sdr = 0;
@@ -871,40 +871,45 @@ assign S32X_SDR_DI   = ddr_do[15:0];
 assign S32X_SDR_WAIT = ddr_busy;
 
 
-wire sdr_busy, sdr_busy1, sdr_busy2;
-wire [15:0] sdr_do0,sdr_do1,sdr_do2;
+wire sdr_busy[4];
+wire [15:0] sdr_do[4];
 sdram sdram
 (
 	.*,
 	.init(~locked),
 	.clk(clk_ram),
 
-	//
-	.addr0(cart_download ? {1'b0,ioctl_addr[23:1]} : {7'b1000000,S32X_SDR_A}), // 0000000-0FFFFFF
-	.din0(cart_download ? {ioctl_data[7:0],ioctl_data[15:8]} : S32X_SDR_DO),
-	.dout0(sdr_do0),
+	//SDRAM
+	.addr0({7'b1000000,S32X_SDR_A}), // 1000000-103FFFF
+	.din0(S32X_SDR_DO),
+	.dout0(sdr_do[0]),
 	.rd0(use_sdr & S32X_SDR_CS & S32X_SDR_RD),
-	.wrl0(cart_download ? ioctl_wait : use_sdr & S32X_SDR_CS & S32X_SDR_WE[0]),
-	.wrh0(cart_download ? ioctl_wait : use_sdr & S32X_SDR_CS & S32X_SDR_WE[1]),
-	.busy0(sdr_busy),
+	.wr0(S32X_SDR_WE & {2{use_sdr & S32X_SDR_CS}}),
+	.busy0(sdr_busy[0]),
 
 	//CART ROM
 	.addr1({1'b0,CART_ROM_A[23:1]}),
 	.din1(CART_ROM_DO),
-	.dout1(sdr_do1),
+	.dout1(sdr_do[1]),
 	.rd1(CART_ROM_RD | CART_ROM_WRL | CART_ROM_WRH),
-	.wrl1(CART_ROM_WRL & schan_quirk),
-	.wrh1(CART_ROM_WRH & schan_quirk),
-	.busy1(sdr_busy1),
+	.wr1({CART_ROM_WRH,CART_ROM_WRL} & {2{schan_quirk}}),
+	.busy1(sdr_busy[1]),
 
-	//CART SRAM, Load/Save
-	.addr2(/*cart_download ? {2'b00,ioctl_addr[22:1]} :*/ {10'b1000000000,CART_SRAM_A[14:1]}),	//CART RAM 1000000-1007FFF
-	.din2(/*cart_download ? {ioctl_data[7:0],ioctl_data[15:8]} :*/ {CART_SRAM_DO,CART_SRAM_DO}),
-	.dout2(sdr_do2),
+	//CART SRAM
+	.addr2({9'b110000000,CART_SRAM_A[15:1]}),	//CART RAM 1800000-180FFFF
+	.din2({8'hFF,CART_SRAM_DO}),
+	.dout2(sdr_do[2]),
 	.rd2(CART_SRAM_RD),
-	.wrl2(CART_SRAM_WR &  CART_SRAM_A[0]),
-	.wrh2(CART_SRAM_WR & ~CART_SRAM_A[0]),
-	.busy2(sdr_busy2)
+	.wr2({2{CART_SRAM_WR}}),
+	.busy2(sdr_busy[2]),
+	
+	//ROM/BRAM Load/Save
+	.addr3(rom_download ? {1'b0,ioctl_addr[23:1]} : {9'b110000000,sd_lba[6:0],tmpram_addr}),
+	.din3(rom_download ? {ioctl_data[7:0],ioctl_data[15:8]} : {tmpram_dout[7:0],tmpram_dout[15:8]}),
+	.dout3(sdr_do[3]),
+	.rd3(rom_download ? 1'b0 : (tmpram_req & ~bk_loading)),
+	.wr3(rom_download ? {2{ioctl_wait}} : {2{tmpram_req & bk_loading}}),
+	.busy3(sdr_busy[3])
 );
 
 `ifdef DUAL_SDRAM
@@ -1022,7 +1027,7 @@ always @(posedge clk_sys) begin
 	reg old_pal;
 	int to;
 	
-	if(~(reset | cart_download)) begin
+	if(~(reset | rom_download)) begin
 		old_pal <= PAL;
 		if(old_pal != PAL) to <= 5000000;
 	end
@@ -1201,19 +1206,19 @@ reg [24:0] rom_sz;
 reg s32x_rom = 0;
 always @(posedge clk_sys) begin
 	reg old_download;
-	old_download <= cart_download;
+	old_download <= rom_download;
 
-	if(~old_download && cart_download) begin
+	if(~old_download && rom_download) begin
 		{hdr_j,hdr_u,hdr_e} <= 0;
 		s32x_rom <= 1; //&ioctl_index[7:6];
 	end
 	
-	if(old_download && ~cart_download) begin
+	if(old_download && ~rom_download) begin
 		cart_hdr_ready <= 0;
 		rom_sz <= ioctl_addr[24:0];
 	end
 
-	if(ioctl_wr & cart_download) begin
+	if(ioctl_wr & rom_download) begin
 		if(ioctl_addr == 'h1F0) begin
 			if(ioctl_data[7:0] == "J") hdr_j <= 1;
 			else if(ioctl_data[7:0] == "U") hdr_u <= 1;
@@ -1251,11 +1256,11 @@ always @(posedge clk_sys) begin
 	reg [15:0] crc = '0;
 	reg [31:0] realtec_id = '0;
 	reg old_download;
-	old_download <= cart_download;
+	old_download <= rom_download;
 
-	if(~old_download && cart_download) {/*fifo_quirk,*/eeprom_map,realtec_map,noram_quirk,pier_quirk,svp_quirk,fmbusy_quirk,schan_quirk,sf_map} <= 0;
+	if(~old_download && rom_download) {/*fifo_quirk,*/eeprom_map,realtec_map,noram_quirk,pier_quirk,svp_quirk,fmbusy_quirk,schan_quirk,sf_map} <= 0;
 
-	if(ioctl_wr & cart_download) begin
+	if(ioctl_wr & rom_download) begin
 		if(ioctl_addr == 'h180) cart_id[87:72] <= {ioctl_data[7:0],ioctl_data[15:8]};
 		if(ioctl_addr == 'h182) cart_id[71:56] <= {ioctl_data[7:0],ioctl_data[15:8]};
 		if(ioctl_addr == 'h184) cart_id[55:40] <= {ioctl_data[7:0],ioctl_data[15:8]};
@@ -1339,12 +1344,14 @@ end
 
 
 /////////////////////////  BRAM SAVE/LOAD  /////////////////////////////
-wire downloading = cart_download;
+wire downloading = rom_download;
+wire bk_change  = CART_SRAM_WR;
+wire autosave   = status[13];
+wire bk_load    = status[16];
+wire bk_save    = status[17];
 
 reg bk_ena = 0;
 reg sav_pending = 0;
-wire bk_change;
-
 always @(posedge clk_sys) begin
 	reg old_downloading = 0;
 	reg old_change = 0;
@@ -1356,55 +1363,139 @@ always @(posedge clk_sys) begin
 	if(downloading && img_mounted && !img_readonly) bk_ena <= 1;
 
 	old_change <= bk_change;
-	if (~old_change & bk_change & ~OSD_STATUS) sav_pending <= status[13];
+	if (~old_change & bk_change) sav_pending <= 1;
 	else if (bk_state) sav_pending <= 0;
 end
 
-wire bk_load    = status[16];
-wire bk_save    = status[17] | (sav_pending & OSD_STATUS);
+wire bk_save_a  = autosave & OSD_STATUS;
 reg  bk_loading = 0;
 reg  bk_state   = 0;
+//reg  bk_reload  = 0;
 
 always @(posedge clk_sys) begin
 	reg old_downloading = 0;
-	reg old_load = 0, old_save = 0, old_ack;
+	reg old_load = 0, old_save = 0, old_save_a = 0, old_ack;
+	reg [1:0] state;
 
 	old_downloading <= downloading;
 
-	old_load <= bk_load;
-	old_save <= bk_save;
-	old_ack  <= sd_ack;
+	old_load   <= bk_load;
+	old_save   <= bk_save;
+	old_save_a <= bk_save_a;
+	old_ack    <= sd_ack;
 
 	if(~old_ack & sd_ack) {sd_rd, sd_wr} <= 0;
 
-	if(!bk_state) begin
-		if(bk_ena & ((~old_load & bk_load) | (~old_save & bk_save))) begin
+	if (!bk_state) begin
+		tmpram_tx_start <= 0;
+		state <= 0;
+		sd_lba <= 0;
+//		bk_reload <= 0;
+		bk_loading <= 0;
+		if (bk_ena & ((~old_load & bk_load) | (~old_save & bk_save) | (~old_save_a & bk_save_a & sav_pending))) begin
 			bk_state <= 1;
 			bk_loading <= bk_load;
-			sd_lba <= 0;
+//			bk_reload <= bk_load;
 			sd_rd <=  bk_load;
-			sd_wr <= ~bk_load;
+			sd_wr <= 0;
 		end
-		if(old_downloading & ~downloading & |img_size & bk_ena) begin
+		if (old_downloading & ~rom_download & bk_ena) begin
 			bk_state <= 1;
 			bk_loading <= 1;
-			sd_lba <= 0;
 			sd_rd <= 1;
 			sd_wr <= 0;
 		end
-	end else begin
-		if(old_ack & ~sd_ack) begin
-			if(&sd_lba[6:0]) begin
-				bk_loading <= 0;
-				bk_state <= 0;
-			end else begin
-				sd_lba <= sd_lba + 1'd1;
-				sd_rd  <=  bk_loading;
-				sd_wr  <= ~bk_loading;
-			end
+	end
+	else begin
+		if (bk_loading) begin
+			case(state)
+				0: begin
+						sd_rd <= 1;
+						state <= 1;
+					end
+				1: if(old_ack & ~sd_ack) begin
+						tmpram_tx_start <= 1;
+						state <= 2;
+					end
+				2: if(tmpram_tx_finish) begin
+						tmpram_tx_start <= 0;
+						state <= 0;
+						sd_lba <= sd_lba + 1'd1;
+						if(sd_lba[6:0] == 7'h7F) bk_state <= 0;
+					end
+			endcase
+		end
+		else begin
+			case(state)
+				0: begin
+						tmpram_tx_start <= 1;
+						state <= 1;
+					end
+				1: if(tmpram_tx_finish) begin
+						tmpram_tx_start <= 0;
+						sd_wr <= 1;
+						state <= 2;
+					end
+				2: if(old_ack & ~sd_ack) begin
+						state <= 0;
+						sd_lba <= sd_lba + 1'd1;
+						if(sd_lba[6:0] == 7'h7F) bk_state <= 0;
+					end
+			endcase
 		end
 	end
 end
+
+wire [15:0] tmpram_dout;
+wire [15:0] tmpram_din = {sdr_do[3][7:0],sdr_do[3][15:8]};
+wire        tmpram_busy = sdr_busy[3];
+
+wire [15:0] tmpram_sd_buff_q;
+dpram_dif #(8,16,8,16) tmpram
+(
+	.clock(clk_sys),
+
+	.address_a(tmpram_addr),
+	.wren_a(~bk_loading & tmpram_busy_d & ~tmpram_busy),
+	.data_a(tmpram_din),
+	.q_a(tmpram_dout),
+
+	.address_b(sd_buff_addr),
+	.wren_b(sd_buff_wr & sd_ack /*& |sd_lba[10:4]*/),
+	.data_b(sd_buff_dout),
+	.q_b(tmpram_sd_buff_q)
+);
+
+//reg [10:0] tmpram_lba;
+reg  [8:1] tmpram_addr;
+reg tmpram_tx_start;
+reg tmpram_tx_finish;
+reg tmpram_req;
+reg tmpram_busy_d;
+always @(posedge clk_sys) begin
+	reg state;
+
+//	tmpram_lba <= sd_lba[10:0] - 11'h10;
+	
+	tmpram_busy_d <= tmpram_busy;
+	if (~tmpram_busy_d & tmpram_busy) tmpram_req <= 0;
+
+	if (~tmpram_tx_start) {tmpram_addr, state, tmpram_tx_finish} <= '0;
+	else if(~tmpram_tx_finish) begin
+		if(!state) begin
+			tmpram_req <= 1;
+			state <= 1;
+		end
+		else if(tmpram_busy_d & ~tmpram_busy) begin
+			state <= 0;
+			if(~&tmpram_addr) tmpram_addr <= tmpram_addr + 1'd1;
+			else tmpram_tx_finish <= 1;
+		end
+	end
+end
+
+assign sd_buff_din = tmpram_sd_buff_q;
+
 
 wire [7:0] SERJOYSTICK_IN;
 wire [7:0] SERJOYSTICK_OUT;

@@ -87,10 +87,10 @@ module SH7604_CACHE (
 	function bit [5:0] LRUSelect(input bit [3:0] way, input bit [5:0] lru);
 		bit [5:0] res;
 
-		res = way[0] ? {1'b0  ,1'b0  ,1'b0  ,lru[2],lru[1],lru[0]} :
-		      way[1] ? {1'b1  ,lru[4],lru[3],1'b0  ,1'b0  ,lru[0]} :
+		res = way[3] ? {lru[5],lru[4],1'b1,  lru[2],1'b1,  1'b1  } :
 		      way[2] ? {lru[5],1'b1  ,lru[3],1'b1  ,lru[1],1'b0  } :
-		      way[3] ? {lru[5],lru[4],1'b1,  lru[2],1'b1,  1'b1  } :
+		      way[1] ? {1'b1  ,lru[4],lru[3],1'b0  ,1'b0  ,lru[0]} :
+				way[0] ? {1'b0  ,1'b0  ,1'b0  ,lru[2],lru[1],lru[0]} :
 				         {1'b0  ,1'b0  ,1'b0  ,lru[2],lru[1],lru[0]};
 		return res;
 	endfunction
@@ -320,10 +320,10 @@ module SH7604_CACHE (
 	wire  [9:0] CRAM_RDADDR = {CRAM_RDWAY,CBUS_A[9:2]};
 	
 	bit  [31:0] CRAM_Q;
-	CACHE_RAM ram0(.wrclock(CLK), .wraddress(CRAM_WRADDR), .data(CRAM_D[ 7: 0]), .wren(CRAM_WE[0] & CE_R), .rdclock(CLK), .rdaddress(CRAM_RDADDR), .q(CRAM_Q[ 7: 0]));
-	CACHE_RAM ram1(.wrclock(CLK), .wraddress(CRAM_WRADDR), .data(CRAM_D[15: 8]), .wren(CRAM_WE[1] & CE_R), .rdclock(CLK), .rdaddress(CRAM_RDADDR), .q(CRAM_Q[15: 8]));
-	CACHE_RAM ram2(.wrclock(CLK), .wraddress(CRAM_WRADDR), .data(CRAM_D[23:16]), .wren(CRAM_WE[2] & CE_R), .rdclock(CLK), .rdaddress(CRAM_RDADDR), .q(CRAM_Q[23:16]));
-	CACHE_RAM ram3(.wrclock(CLK), .wraddress(CRAM_WRADDR), .data(CRAM_D[31:24]), .wren(CRAM_WE[3] & CE_R), .rdclock(CLK), .rdaddress(CRAM_RDADDR), .q(CRAM_Q[31:24]));
+	CACHE_RAM ram0(.wrclock(CLK), .wraddress(CRAM_WRADDR), .data(CRAM_D[ 7: 0]), .wren(CRAM_WE[0] & EN & CE_R), .rdclock(CLK), .rdaddress(CRAM_RDADDR), .q(CRAM_Q[ 7: 0]));
+	CACHE_RAM ram1(.wrclock(CLK), .wraddress(CRAM_WRADDR), .data(CRAM_D[15: 8]), .wren(CRAM_WE[1] & EN & CE_R), .rdclock(CLK), .rdaddress(CRAM_RDADDR), .q(CRAM_Q[15: 8]));
+	CACHE_RAM ram2(.wrclock(CLK), .wraddress(CRAM_WRADDR), .data(CRAM_D[23:16]), .wren(CRAM_WE[2] & EN & CE_R), .rdclock(CLK), .rdaddress(CRAM_RDADDR), .q(CRAM_Q[23:16]));
+	CACHE_RAM ram3(.wrclock(CLK), .wraddress(CRAM_WRADDR), .data(CRAM_D[31:24]), .wren(CRAM_WE[3] & EN & CE_R), .rdclock(CLK), .rdaddress(CRAM_RDADDR), .q(CRAM_Q[31:24]));
 	
 	
 	wire [19:0] CTAG_D = CACHE_UPDATE ? {CACHE_WR_ADDR[28:10],1'b1} : CACHE_ADDR_WRITE ? {CACHE_WR_ADDR[28:10],CACHE_WR_ADDR[2]} : '0;
@@ -333,10 +333,10 @@ module SH7604_CACHE (
 	bit  [19:0] CTAG1_Q;
 	bit  [19:0] CTAG2_Q;
 	bit  [19:0] CTAG3_Q;
-	CACHE_TAG tag0(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[0] & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG0_Q));
-	CACHE_TAG tag1(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[1] & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG1_Q));
-	CACHE_TAG tag2(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[2] & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG2_Q));
-	CACHE_TAG tag3(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[3] & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG3_Q));
+	CACHE_TAG tag0(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[0] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG0_Q));
+	CACHE_TAG tag1(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[1] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG1_Q));
+	CACHE_TAG tag2(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[2] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG2_Q));
+	CACHE_TAG tag3(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[3] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG3_Q));
 	
 	reg [63:0] TAG_DIRTY[4];
 	always @(posedge CLK or negedge RST_N) begin
@@ -354,16 +354,9 @@ module SH7604_CACHE (
 		end
 	end
 	
-	wire  [5:0] LRU_WRADDR = CACHE_WR_ADDR[9:4];
-	wire  [5:0] LRU_RDADDR = CACHE_UPDATE || CACHE_WRITE || CACHE_READ || CACHE_ADDR_WRITE ? CACHE_WR_ADDR[9:4] : CBUS_A[9:4];
-	wire  [5:0] LRU_D = CACHE_ADDR_WRITE ? CBUS_DI[9:4] : LRUSelect(CACHE_WR_WAY, LRU_DATA);
-	wire        LRU_WE = CACHE_UPDATE | CACHE_WRITE | CACHE_READ | CACHE_ADDR_WRITE;
-	
-	bit  [5:0] LRU_Q;
-	CACHE_LRU lru(.clock(CLK), .wraddress(LRU_WRADDR), .data(LRU_D), .wren(LRU_WE & CE_R), .rdaddress(LRU_RDADDR), .q(LRU_Q));
-	
-	bit [3:0] DIRTY;
 	always_comb begin	
+		bit [3:0] DIRTY;
+		
 		DIRTY[0] = TAG_DIRTY[0][CBUS_A[9:4]];
 		DIRTY[1] = TAG_DIRTY[1][CBUS_A[9:4]];
 		DIRTY[2] = TAG_DIRTY[2][CBUS_A[9:4]];
@@ -381,15 +374,44 @@ module SH7604_CACHE (
 		
 		if (CACHE_ADDR_AREA) 
 			case (CCR.W)
-				2'b00: CACHE_DATA = {3'b000,CTAG0_Q[`TAG],LRU_Q,1'b0,CTAG0_Q[`VBIT],2'b00};
-				2'b01: CACHE_DATA = {3'b000,CTAG1_Q[`TAG],LRU_Q,1'b0,CTAG1_Q[`VBIT],2'b00};
-				2'b10: CACHE_DATA = {3'b000,CTAG2_Q[`TAG],LRU_Q,1'b0,CTAG2_Q[`VBIT],2'b00};
-				2'b11: CACHE_DATA = {3'b000,CTAG3_Q[`TAG],LRU_Q,1'b0,CTAG3_Q[`VBIT],2'b00};
+				2'b00: CACHE_DATA = {3'b000,CTAG0_Q[`TAG],LRU_B_Q,1'b0,CTAG0_Q[`VBIT],2'b00};
+				2'b01: CACHE_DATA = {3'b000,CTAG1_Q[`TAG],LRU_B_Q,1'b0,CTAG1_Q[`VBIT],2'b00};
+				2'b10: CACHE_DATA = {3'b000,CTAG2_Q[`TAG],LRU_B_Q,1'b0,CTAG2_Q[`VBIT],2'b00};
+				2'b11: CACHE_DATA = {3'b000,CTAG3_Q[`TAG],LRU_B_Q,1'b0,CTAG3_Q[`VBIT],2'b00};
 			endcase
 		else
 			CACHE_DATA = CRAM_Q;
-			
-		LRU_DATA = LRU_Q & {6{~&DIRTY}};
+	end
+	
+	reg [63:0] LRU_DIRTY;
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			LRU_DIRTY <= '1;
+		end
+		else if (EN && CE_R) begin
+			if (LRU_WE) LRU_DIRTY[LRU_WRADDR] <= 0;
+		end
+		else if (CCR.CP) begin
+			LRU_DIRTY <= '1;
+		end
+	end
+	
+	wire  [5:0] LRU_WRADDR = CACHE_WR_ADDR[9:4];
+	wire  [5:0] LRU_A_RDADDR = CACHE_WR_ADDR[9:4];
+	wire  [5:0] LRU_B_RDADDR = CBUS_A[9:4];
+	wire  [5:0] LRU_D = CACHE_ADDR_WRITE ? CBUS_DI[9:4] : LRUSelect(CACHE_WR_WAY, LRU_A_Q & {6{~LRU_DIRTY[LRU_A_RDADDR]}});
+	wire        LRU_WE = CACHE_UPDATE | CACHE_WRITE | CACHE_READ | CACHE_ADDR_WRITE;
+	
+	bit  [5:0] LRU_A_Q,LRU_B_Q;
+	CACHE_LRU lru_a(.clock(CLK), .wraddress(LRU_WRADDR), .data(LRU_D), .wren(LRU_WE & EN & CE_R), .rdaddress(LRU_A_RDADDR), .q(LRU_A_Q));
+	CACHE_LRU lru_b(.clock(CLK), .wraddress(LRU_WRADDR), .data(LRU_D), .wren(LRU_WE & EN & CE_R), .rdaddress(LRU_B_RDADDR), .q(LRU_B_Q));
+	
+	always_comb begin	
+		bit       DIRTY;
+
+		DIRTY = LRU_DIRTY[LRU_B_RDADDR];
+		
+		LRU_DATA = LRU_B_Q & {6{~DIRTY}};
 	end
 	
 `endif

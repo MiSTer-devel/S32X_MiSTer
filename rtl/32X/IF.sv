@@ -1030,9 +1030,11 @@ module S32X_IF
 	
 	assign DTACK_N = MD_REG_DTACK_N & MD_ROM_DTACK_N & VDP_DTACK_N & ~MD_32XID_SEL & ~(MD_BIOS_SEL & ~CE0_N_SYNC[0] & ~AS_N_SYNC[0]);
 	
-	assign SHDO = SH_ROM_SEL ? SH_ROM_DO : 
-	              SH_VDP_SEL ? VDP_DI : 
-					  SH_REG_DO;
+	assign SHDO = SH_ROM_SEL    ? SH_ROM_DO : 
+	              SH_VDP_SEL    ? VDP_DI : 
+					  SH_SYSREG_SEL ? SH_REG_DO : 
+					  SH_BIOS_SEL   ? SH_REG_DO : 
+					                  16'h0000;
 	assign SHWAIT_N = ~SH_ROM_WAIT & ~SH_VDP_WAIT /*& ~SH_SYSREG_WAIT*/;
 	
 	assign SHRES_N = ADCR.RES /*| ~ADCR.REN*/;

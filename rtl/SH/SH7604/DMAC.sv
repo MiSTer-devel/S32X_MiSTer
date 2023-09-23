@@ -264,22 +264,28 @@ module SH7604_DMAC (
 					if      (CHCR[DMA_CH].DM == 2'b01) DAR[DMA_CH] <= DAR[DMA_CH] + AR_INC;
 					else if (CHCR[DMA_CH].DM == 2'b10) DAR[DMA_CH] <= DAR[DMA_CH] - AR_INC;
 					
-					if (!CHCR[DMA_CH].TA && !LW_CNT) begin
-						DMA_WR <= 0;
-						DMA_RD <= 1;
-						DMA_BURST <= &CHCR[DMA_CH].TS;
-						DMA_LOCK <= CHCR[DMA_CH].TB | &CHCR[DMA_CH].TS;
-						LW_CNT <= &CHCR[DMA_CH].TS ? 2'd3 : 2'd0;
-						
-						if (!CHCR[DMA_CH].TB) DMA_RD <= 0;
+					if (LW_CNT == 2'd1) begin
+						if (!CHCR[DMA_CH].TB) DMA_LOCK <= 0;
 					end 
-					else if (CHCR[DMA_CH].TA && CHCR[DMA_CH].AM && !LW_CNT) begin
-						CH_REQ_CLR[DMA_CH] <= 1;
-						LW_CNT <= &CHCR[DMA_CH].TS ? 2'd3 : 2'd0;
+					if (!LW_CNT) begin
+						if (!CHCR[DMA_CH].TA) begin
+							DMA_WR <= 0;
+							if (CHCR[DMA_CH].TB) begin
+								DMA_RD <= 1;
+								DMA_BURST <= &CHCR[DMA_CH].TS;
+								DMA_LOCK <= CHCR[DMA_CH].TB | &CHCR[DMA_CH].TS;
+								LW_CNT <= &CHCR[DMA_CH].TS ? 2'd3 : 2'd0;
+							end
+						end 
+						else if (CHCR[DMA_CH].TA && CHCR[DMA_CH].AM) begin
+							CH_REQ_CLR[DMA_CH] <= 1;
+							LW_CNT <= &CHCR[DMA_CH].TS ? 2'd3 : 2'd0;
+							
+							if (!CHCR[DMA_CH].TB) DMA_WR <= 0;
+						end
 						
-						if (!CHCR[DMA_CH].TB) DMA_WR <= 0;
+						DMA_REQ_CLR <= 1;
 					end
-					if (!LW_CNT) DMA_REQ_CLR <= 1;
 					
 					TCR[DMA_CH] <= TCR_NEXT;
 					if (!TCR_NEXT) begin
