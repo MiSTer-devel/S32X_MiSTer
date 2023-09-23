@@ -115,11 +115,11 @@ module SH7604_MULT (
 				if (!SAT) begin
 					{MACH,MACL} <= ACC;
 				end else begin
-					if (ACC[63:32]) begin
-						MACL <= {ACC[63],{31{~ACC[63]}}};
+					if (ACC[63:32] != {32{ACC[31]}}) begin
+						MACL <= {~ACC[31],{31{ACC[31]}}};
 						MACH <= 32'h00000001;
 					end else begin
-						MACL <= ACC[31:0];
+						{MACH,MACL} <= ACC;
 					end
 				end
 				MACW_EXEC <= 0;

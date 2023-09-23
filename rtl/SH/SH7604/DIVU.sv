@@ -39,17 +39,39 @@ module SH7604_DIVU (
 	bit   [31:0] Q;
 	bit          OVF;
 	always @(posedge CLK or negedge RST_N) begin
+		bit   [64:0] VAL;
+		bit          NEG;
+		bit   [64:0] NRES;
 		bit   [64:0] D;
 		bit   [64:0] SUM;
-		bit   [31:0] TEMP;
-//		bit          DIV64;
+		bit          DIV64;
+		bit          OVF0;
 		
 		if (!RST_N) begin
 			STEP <= 6'h3F;
-			R <= '0;
-			D <= '0;
-			Q <= '0;
 			OVF <= 0;
+		end
+		else if (EN && CE_F) begin
+			if (STEP == 6'd1) begin
+				VAL <= {DVDNTH[31],DVDNTH,DVDNTL};
+				NEG <= DVDNTH[31];
+			end
+			else if (STEP == 6'd2) begin
+				VAL <= {DVSR[31],DVSR,32'h00000000};
+				NEG <= DVSR[31];
+			end
+//			else if (STEP >= 6'd3 && STEP <= 6'd35) begin
+//				SA <= R;
+//				SB <= D;
+//			end
+			else if (STEP == 6'd36) begin
+				VAL <= R;
+				NEG <= DVDNTH[31];
+			end
+			else if (STEP == 6'd37) begin
+				VAL <= {{33{Q[31]}},Q};
+				NEG <= DVDNTH[31]^DVSR[31];
+			end
 		end
 		else if (EN && CE_R) begin
 			if (STEP != 6'h3F) begin
@@ -57,30 +79,41 @@ module SH7604_DIVU (
 			end
 			if (STEP == 6'h3F && (DIV32_START || DIV64_START)) begin
 				STEP <= 6'd0;
-//				DIV64 <= DIV64_START;
+				DIV64 <= DIV64_START;
+				OVF0 <= 0;
 				OVF <= 0;
 			end
 			
-			SUM = $signed(R) - $signed(D);
+			NRES = (VAL^{65{NEG}}) + {{64{1'b0}},NEG};
 			if (STEP == 6'd0) begin
 				Q <= '0;
-				R <= DVDNTH[31] ? ~{DVDNTH[31],DVDNTH,DVDNTL} + 1 : {DVDNTH[31],DVDNTH,DVDNTL};
-				D <= {DVSR[31] ? ~{DVSR[31],DVSR} + 1 : {DVSR[31],DVSR}, 32'h00000000};
-				
-				if (!DVSR /*|| (DIV64 && DVDNTH >= DVSR)*/) begin
-					OVF <= 1;
-				end
 			end
-			else if (STEP >= 6'd4 && STEP <= 6'd36) begin
+			else if (STEP == 6'd1) begin
+				R <= NRES;
+			end
+			else if (STEP == 6'd2) begin
+				D <= NRES;
+				
+				if (!DVSR) OVF0 <= 1;
+			end
+			else if (STEP >= 6'd3 && STEP <= 6'd35) begin
+				SUM = $signed(R) - $signed(D);
 				R <= !SUM[64] ? SUM : R;
 				Q <= {Q[30:0],~SUM[64]};
 				D <= {D[64],D[64:1]};
 				
-				if (STEP == 6'd5 && OVF) STEP <= 6'd38;
+				if (STEP == 6'd3 && !SUM[64] && DIV64) OVF0 <= 1;
+				if (STEP == 6'd4 && !SUM[64] && DIV64) OVF0 <= 1;
+				if (STEP == 6'd5 && OVF0) begin
+					OVF <= 1; 
+					STEP <= 6'd38;
+				end
+			end
+			else if (STEP == 6'd36) begin
+				R <= NRES;
 			end
 			else if (STEP == 6'd37) begin
-				Q <= DVDNTH[31]^DVSR[31] ? (~Q + 1) : Q;
-				R <= DVDNTH[31] ? (~R + 1) : R;
+				Q <= NRES[31:0];
 			end
 			if (STEP == 6'd38) begin
 				STEP <= 6'h3F;
