@@ -553,7 +553,8 @@ module SH7604_BSC
 				else if (BREQ && BACK && SLV_BUS_RLS) begin
 					SLV_BUS_RLS <= 0;
 				end
-				else if (BREQ && (BUS_STATE == T2 || BUS_STATE == TD || BUS_STATE == TV2) && !BUSY && !IBUS_LOCK && !SLV_BUS_RLS) begin
+                                else if ((BREQ && (BUS_STATE == T2 || BUS_STATE == TD || BUS_STATE == TV2) && !BUSY && !IBUS_LOCK && !SLV_BUS_RLS) || 
+				         (BREQ && BUS_STATE == T0 && !BUSY && !RES_N && !SLV_BUS_RLS)) begin
 					BREQ <= 0;
 				end
 				else if (!BREQ && !SLV_BUS_RLS ) begin
