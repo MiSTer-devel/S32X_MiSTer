@@ -1,0 +1,41 @@
+name: CI Build (S32X_MiSTer)
+
+on:
+  push:
+  workflow_dispatch:
+  schedule:
+  - cron:  "0 */4 * * *"
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        path: project
+
+    - uses: actions/checkout@v3
+      with:
+        repository: srg320/SH
+        path: SH
+
+    - uses: actions/checkout@v3
+      with:
+        repository: YLFAndy/S32X_MiSTer
+        path: S32X
+
+    - name: ls
+      run: tree
+
+    - name: Build
+      run: set -o pipefail && cd project && curl --fail --location https://raw.githubusercontent.com/MiSTer-unstable-nightlies/Build-Automation_MiSTer/main/build.sh | bash -
+      env:
+        CORE_NAME: S32X_MiSTer
+        COMPILATION_COMMAND: /opt/intelFPGA_lite/quartus/bin/quartus_sh --flow compile project/S32X_MiSTer.qpf
+        COMPILATION_OUTPUT: project/output_files/S32X_MiSTer.rbf
+        DOCKER_FOLDER: ..
+
+        REPOSITORY: ${{ github.repository }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DISPATCH_TOKEN: ${{ secrets.BUILD_AUTOMATION_DISPATCH_TOKEN }}
