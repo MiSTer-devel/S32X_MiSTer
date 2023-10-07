@@ -23,7 +23,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         repository: YLFAndy/S32X_MiSTer
-        path: S32X
+        path: S32X_MiSTer
 
     - name: ls
       run: tree
@@ -32,7 +32,7 @@ jobs:
       run: set -o pipefail && cd project && curl --fail --location https://raw.githubusercontent.com/MiSTer-unstable-nightlies/Build-Automation_MiSTer/main/build.sh | bash -
       env:
         CORE_NAME: S32X_MiSTer
-        COMPILATION_COMMAND: /opt/intelFPGA_lite/quartus/bin/quartus_sh --flow compile project/S32X_MiSTer.qpf
+        COMPILATION_COMMAND: /opt/intelFPGA_lite/quartus/bin/quartus_sh --flow compile project/S32X.qpf
         COMPILATION_OUTPUT: project/output_files/S32X_MiSTer.rbf
         DOCKER_FOLDER: ..
 
