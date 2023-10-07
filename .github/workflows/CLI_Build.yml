@@ -33,7 +33,7 @@ jobs:
       env:
         CORE_NAME: S32X
         COMPILATION_COMMAND: /opt/intelFPGA_lite/quartus/bin/quartus_sh --flow compile project/S32X.qpf
-        COMPILATION_OUTPUT: project/output_files/S32X_MiSTer.rbf
+        COMPILATION_OUTPUT: project/output_files/S32X.rbf
         DOCKER_FOLDER: ..
 
         REPOSITORY: ${{ github.repository }}
