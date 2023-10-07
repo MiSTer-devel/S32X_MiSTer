@@ -200,6 +200,7 @@ module BA
 			case(mstate)
 			MBUS_IDLE:
 				begin
+				MBUS_AS_N <= 1; //Assume MBUS idle and update if activity exists
 				if (!PAUSE_EN) begin
 					msrc <= MSRC_NONE;
 					if (!M68K_AS_N && (!M68K_LDS_N || !M68K_UDS_N) && M68K_MBUS_DTACK_N && !M68K_INTACK) begin
@@ -535,6 +536,7 @@ module BA
 							OPEN_BUS <= MBUS_DI;
 						end
 					end
+					MBUS_AS_N <= 1; //Always return execution to SH on finish.
 				end
 			endcase;
 		end
