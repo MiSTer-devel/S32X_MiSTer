@@ -34,9 +34,9 @@ module SH_core
 	input             VECT_WAIT,
 	
 	output            SLEEP
-	
 `ifdef DEBUG
 	                  ,
+	output     [31:0] DBG_BUS_A,
 	output			   ILI,
 	
 	input       [4:0] DBG_REGN,
@@ -355,7 +355,8 @@ module SH_core
 	wire BP_A_WBEXB = (PIPE.EX.DI.RA.N == PIPE.WB2.DI.RB.N) & PIPE.EX.DI.RA.R & PIPE.WB2.DI.RB.W;  
 	wire BP_B_WBEXA = (PIPE.EX.DI.RB.N == PIPE.WB2.DI.RA.N) & PIPE.EX.DI.RB.R & PIPE.WB2.DI.RA.W;
 	wire BP_B_WBEXB = (PIPE.EX.DI.RB.N == PIPE.WB2.DI.RB.N) & PIPE.EX.DI.RB.R & PIPE.WB2.DI.RB.W;
-	wire BP_C_WBEX  = (5'd0            == PIPE.WB2.DI.RA.N) & PIPE.EX.DI.R0R  & PIPE.WB2.DI.RA.W;
+	wire BP_C_WBEXA = (5'd0            == PIPE.WB2.DI.RA.N) & PIPE.EX.DI.R0R  & PIPE.WB2.DI.RA.W;
+	wire BP_C_WBEXB = (5'd0            == PIPE.WB2.DI.RB.N) & PIPE.EX.DI.R0R  & PIPE.WB2.DI.RB.W;
 	
 	wire BP_A_MALD = (PIPE.EX.DI.RA.N == PIPE.MA.DI.RA.N)  & PIPE.EX.DI.RA.R & PIPE.MA.DI.RA.W & ((PIPE.MA.DI.MEM.R & !PIPE.MA.DI.MAC.W) | (PIPE.MA.DI.MAC.R & !PIPE.MA.DI.MEM.W));
 	wire BP_B_MALD = (PIPE.EX.DI.RB.N == PIPE.MA.DI.RA.N)  & PIPE.EX.DI.RB.R & PIPE.MA.DI.RA.W & ((PIPE.MA.DI.MEM.R & !PIPE.MA.DI.MAC.W) | (PIPE.MA.DI.MAC.R & !PIPE.MA.DI.MEM.W));
@@ -470,8 +471,11 @@ module SH_core
 		else if (BP_C_MAEX) begin
 			BP_C = PIPE.WB.RES;
 		end
-		else if (BP_C_WBEX) begin
+		else if (BP_C_WBEXA) begin
 			BP_C = PIPE.WB2.RESA;
+		end
+		else if (BP_C_WBEXB) begin
+			BP_C = PIPE.WB2.RESB;
 		end
 		else begin
 			BP_C = PIPE.EX.R0;
@@ -784,7 +788,7 @@ module SH_core
 	assign REGS_WBE = PIPE.WB.DI.RB.W & (!PIPE.WB.DI.RA.W | PIPE.WB.DI.RA.N != PIPE.WB.DI.RB.N) & !WB_STALL;
 	
 	//Ports
-	assign BUS_A = MA_ACTIVE ? PIPE.MA.ADDR : PC;
+	assign BUS_A = MA_ACTIVE ? PIPE.MA.ADDR : (PC & 32'hFFFFFFFC);
 	assign BUS_DO = MA_WDATA;
 	assign BUS_WR = PIPE.MA.DI.MEM.W & MA_ACTIVE;
 	assign BUS_BA = MA_BA | {4{IF_ACTIVE & ~INST_SPLIT & ~IFID_STALL}};
@@ -797,7 +801,7 @@ module SH_core
 	assign MAC_WE = |PIPE.MA.DI.MAC.S & PIPE.MA.DI.MAC.W & MA_ACTIVE & ~MA_STALL;
 	
 	assign INT_MASK = SR.I;
-	assign INT_ACP = ID_DECI.IACP & ~ID_STALL;
+	assign INT_ACP = INT_REQ & ~INT_REQ_LATCH & ~ID_STALL;
 	assign INT_ACK = PIPE.MA.DI.VECR & ~MA_STALL;
 	assign VECT_REQ = VECT_ACTIVE;
 	
@@ -805,6 +809,7 @@ module SH_core
 	
 	//Debug
 `ifdef DEBUG
+	assign DBG_BUS_A = MA_ACTIVE ? PIPE.MA.ADDR : PC;
 	assign ILI = ID_DECI.ILI & ~ID_STALL & ~IFID_STALL;
 	assign DBG_REGQ = DBG_REGN <= 5'h10 ? REGS_RAQ :
 	                  DBG_REGN == 5'h11 ? SR :

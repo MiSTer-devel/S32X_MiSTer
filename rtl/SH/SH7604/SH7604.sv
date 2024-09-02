@@ -1,4 +1,6 @@
-module SH7604 (
+module SH7604
+#(parameter bit UBC_DISABLE=0, bit SCI_DISABLE=0, bit WDT_DISABLE=0)
+(
 	input             CLK,
 	input             RST_N,
 	input             CE_R,
@@ -102,10 +104,6 @@ module SH7604 (
 	
 	bit        SLEEP;
 	
-	bit  [3:0] VBUS_A;
-	bit  [7:0] VBUS_DO;
-	bit        VBUS_REQ;
-	bit        VBUS_BUSY;
 	
 	//CACHE
 	bit [31:0] CACHE_DI;
@@ -115,7 +113,9 @@ module SH7604 (
 	
 	//BSC
 	bit [31:0] BSC_DO;
-	bit        BSC_BUSY;
+	bit        BSC_DBUS_BUSY;
+	bit        BSC_VBUS_BUSY;
+	bit        BSC_EBUS_END;
 	bit        BSC_ACK;
 	
 	//DMAC
@@ -131,6 +131,9 @@ module SH7604 (
 	bit [31:0] INTC_DO;
 	bit        INTC_ACT;
 	bit        INTC_BUSY;
+	bit  [3:0] VBUS_A;
+	bit  [7:0] VBUS_DO;
+	bit        VBUS_REQ;
 	
 	//MULT
 	bit  [1:0] MAC_SEL;
@@ -150,6 +153,7 @@ module SH7604 (
 	//FRT
 	bit [31:0] FRT_DO;
 	bit        FRT_ACT;
+	bit        FRT_BUSY;
 	bit        ICI_IRQ;
 	bit        OCIA_IRQ;
 	bit        OCIB_IRQ;
@@ -182,6 +186,7 @@ module SH7604 (
 	bit        SBY;
 	
 	//Internal clocks
+	bit        CLK2_CE;
 	bit        CLK4_CE;
 	bit        CLK8_CE;
 	bit        CLK16_CE;
@@ -191,7 +196,7 @@ module SH7604 (
 	bit        CLK256_CE;
 	bit        CLK512_CE;
 	bit        CLK1024_CE;
-	//bit        CLK2048_CE;
+	bit        CLK2048_CE;
 	bit        CLK4096_CE;
 	bit        CLK8192_CE;
 	
@@ -317,11 +322,12 @@ module SH7604 (
 						  DMAC_ACT ? DMAC_DO : 
 						             BSC_DO;
 	assign IBUS_WAIT = INTC_ACT ? INTC_BUSY :
+	                   FRT_ACT  ? FRT_BUSY :
 	                   DIVU_ACT ? DIVU_BUSY : 
 	                              DMAC_BUSY;
 
 	
-	SH7604_UBC UBC
+	SH7604_UBC #(UBC_DISABLE) UBC
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
@@ -342,6 +348,62 @@ module SH7604 (
 		
 		.IRQ(UBC_IRQ)
 	);
+	
+	
+	//Clock divider
+	always @(posedge CLK or negedge RST_N) begin
+		bit [12:0] DIV_CNT;
+		
+		if (!RST_N) begin
+			CLK2_CE <= 0;
+			CLK4_CE <= 0;
+			CLK8_CE <= 0;
+			CLK16_CE <= 0;
+			CLK32_CE <= 0;
+			CLK64_CE <= 0;
+			CLK128_CE <= 0;
+			CLK256_CE <= 0;
+			CLK512_CE <= 0;
+			CLK1024_CE <= 0;
+			CLK2048_CE <= 0;
+			CLK4096_CE <= 0;
+			CLK8192_CE <= 0;
+			DIV_CNT <= '0;
+		end
+		else if (!RES_SYNC_N) begin
+			CLK2_CE <= 0;
+			CLK4_CE <= 0;
+			CLK8_CE <= 0;
+			CLK16_CE <= 0;
+			CLK32_CE <= 0;
+			CLK64_CE <= 0;
+			CLK128_CE <= 0;
+			CLK256_CE <= 0;
+			CLK512_CE <= 0;
+			CLK1024_CE <= 0;
+			CLK2048_CE <= 0;
+			CLK4096_CE <= 0;
+			CLK8192_CE <= 0;
+			DIV_CNT <= '0;
+		end
+		else if (CE_R) begin	
+			DIV_CNT <= DIV_CNT + 13'd1;
+			
+			CLK2_CE    <= (DIV_CNT ==? 13'b????????????1);
+			CLK4_CE    <= (DIV_CNT ==? 13'b???????????11);
+			CLK8_CE    <= (DIV_CNT ==? 13'b??????????111);
+			CLK16_CE   <= (DIV_CNT ==? 13'b?????????1111);
+			CLK32_CE   <= (DIV_CNT ==? 13'b????????11111);
+			CLK64_CE   <= (DIV_CNT ==? 13'b???????111111);
+			CLK128_CE  <= (DIV_CNT ==? 13'b??????1111111);
+			CLK256_CE  <= (DIV_CNT ==? 13'b?????11111111);
+			CLK512_CE  <= (DIV_CNT ==? 13'b????111111111);
+			CLK1024_CE <= (DIV_CNT ==? 13'b???1111111111);
+			CLK2048_CE <= (DIV_CNT ==? 13'b??11111111111);
+			CLK4096_CE <= (DIV_CNT ==? 13'b?111111111111);
+			CLK8192_CE <= (DIV_CNT ==? 13'b1111111111111);
+		end
+	end
 	
 	bit  [31:0] DBUS_A;
 	bit  [31:0] DBUS_DO;
@@ -388,7 +450,9 @@ module SH7604 (
 		.DBUS_REQ(DBUS_REQ),
 		.DBUS_BURST(DBUS_BURST),
 		.DBUS_LOCK(DBUS_LOCK),
-		.DBUS_WAIT(BSC_BUSY),
+		.DBUS_WAIT(BSC_DBUS_BUSY),
+		
+		.EBUS_END(BSC_EBUS_END),
 		
 		.BSC_ACK(BSC_ACK),
 		
@@ -442,21 +506,23 @@ module SH7604 (
 		.BGR_N(BGR_N),
 		.MD(MD),
 		
-		.IBUS_A(DBUS_A),
-		.IBUS_DI(DBUS_DO),
-		.IBUS_DO(BSC_DO),
-		.IBUS_BA(DBUS_BA),
-		.IBUS_WE(DBUS_WE),
-		.IBUS_REQ(DBUS_REQ),
-		.IBUS_BURST(DBUS_BURST),
-		.IBUS_LOCK(DBUS_LOCK),
-		.IBUS_BUSY(BSC_BUSY),
-		.IBUS_ACT(),
+		.DBUS_A(DBUS_A),
+		.DBUS_DI(DBUS_DO),
+		.DBUS_DO(BSC_DO),
+		.DBUS_BA(DBUS_BA),
+		.DBUS_WE(DBUS_WE),
+		.DBUS_REQ(DBUS_REQ),
+		.DBUS_BURST(DBUS_BURST),
+		.DBUS_LOCK(DBUS_LOCK),
+		.DBUS_BUSY(BSC_DBUS_BUSY),
+		.DBUS_ACT(),
 		
 		.VBUS_A(VBUS_A),
 		.VBUS_DO(VBUS_DO),
 		.VBUS_REQ(VBUS_REQ),
-		.VBUS_BUSY(VBUS_BUSY),
+		.VBUS_BUSY(BSC_VBUS_BUSY),
+		
+		.EBUS_END(BSC_EBUS_END),
 		
 		.IRQ(),
 		
@@ -521,7 +587,7 @@ module SH7604 (
 		.VBUS_A(VBUS_A),
 		.VBUS_DI(VBUS_DO),
 		.VBUS_REQ(VBUS_REQ),
-		.VBUS_WAIT(VBUS_BUSY)
+		.VBUS_WAIT(BSC_VBUS_BUSY)
 	);
 	
 	SH7604_DIVU divu
@@ -547,44 +613,7 @@ module SH7604 (
 		.VEC(DIVU_VEC)
 	);
 	
-	//Clock divider
-	always @(posedge CLK or negedge RST_N) begin
-		bit [12:0] DIV_CNT;
-		
-		if (!RST_N) begin
-			CLK4_CE <= 0;
-			CLK8_CE <= 0;
-			CLK16_CE <= 0;
-			CLK32_CE <= 0;
-			CLK64_CE <= 0;
-			CLK128_CE <= 0;
-			CLK256_CE <= 0;
-			CLK512_CE <= 0;
-			CLK1024_CE <= 0;
-			//CLK2048_CE <= 0;
-			CLK4096_CE <= 0;
-			CLK8192_CE <= 0;
-			DIV_CNT <= '0;
-		end
-		else if (CE_R) begin	
-			DIV_CNT <= DIV_CNT + 13'd1;
-			
-			CLK4_CE    <= (DIV_CNT ==? 13'b???????????11);
-			CLK8_CE    <= (DIV_CNT ==? 13'b??????????111);
-			CLK16_CE   <= (DIV_CNT ==? 13'b?????????1111);
-			CLK32_CE   <= (DIV_CNT ==? 13'b????????11111);
-			CLK64_CE   <= (DIV_CNT ==? 13'b???????111111);
-			CLK128_CE  <= (DIV_CNT ==? 13'b??????1111111);
-			CLK256_CE  <= (DIV_CNT ==? 13'b?????11111111);
-			CLK512_CE  <= (DIV_CNT ==? 13'b????111111111);
-			CLK1024_CE <= (DIV_CNT ==? 13'b???1111111111);
-			//CLK2048_CE <= (DIV_CNT ==? 13'b??11111111111);
-			CLK4096_CE <= (DIV_CNT ==? 13'b?111111111111);
-			CLK8192_CE <= (DIV_CNT ==? 13'b1111111111111);
-		end
-	end
-
-	SH7604_SCI sci
+	SH7604_SCI #(SCI_DISABLE) sci
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
@@ -635,6 +664,7 @@ module SH7604 (
 		.FTCI(FTCI),
 		.FTI(FTI),
 		
+		.CLK4_CE(CLK4_CE),
 		.CLK8_CE(CLK8_CE),
 		.CLK32_CE(CLK32_CE),
 		.CLK128_CE(CLK128_CE),
@@ -645,7 +675,7 @@ module SH7604 (
 		.IBUS_BA(DBUS_BA),
 		.IBUS_WE(DBUS_WE),
 		.IBUS_REQ(DBUS_REQ),
-		.IBUS_BUSY(),
+		.IBUS_BUSY(FRT_BUSY),
 		.IBUS_ACT(FRT_ACT),
 		
 		.ICI_IRQ(ICI_IRQ),
@@ -654,7 +684,7 @@ module SH7604 (
 		.OVI_IRQ(OVI_IRQ)
 	);
 	
-	SH7604_WDT wdt
+	SH7604_WDT #(WDT_DISABLE) wdt
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
@@ -667,7 +697,7 @@ module SH7604 (
 		
 		.WDTOVF_N(WDTOVF_N),
 		
-		.CLK2_CE(CLK8_CE),
+		.CLK2_CE(CLK2_CE),
 		.CLK64_CE(CLK64_CE),
 		.CLK128_CE(CLK128_CE),
 		.CLK256_CE(CLK256_CE),

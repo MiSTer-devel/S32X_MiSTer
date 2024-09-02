@@ -26,6 +26,8 @@ module SH7604_DIVU (
 	DVDNT_t     DVDNTL;
 	DVDNT_t     DVDNTH;
 	DVCR_t      DVCR;
+	DVDNT_t     DVDNTL2;
+	DVDNT_t     DVDNTH2;
 	VCRDIV_t    VCRDIV;
 	bit         BUSY;
 	
@@ -39,17 +41,39 @@ module SH7604_DIVU (
 	bit   [31:0] Q;
 	bit          OVF;
 	always @(posedge CLK or negedge RST_N) begin
+		bit   [64:0] VAL;
+		bit          NEG;
+		bit   [64:0] NRES;
 		bit   [64:0] D;
 		bit   [64:0] SUM;
-		bit   [31:0] TEMP;
-//		bit          DIV64;
+		bit          DIV64;
+		bit          OVF0;
 		
 		if (!RST_N) begin
 			STEP <= 6'h3F;
-			R <= '0;
-			D <= '0;
-			Q <= '0;
 			OVF <= 0;
+		end
+		else if (EN && CE_F) begin
+			if (STEP == 6'd1) begin
+				VAL <= {DVDNTH[31],DVDNTH,DVDNTL};
+				NEG <= DVDNTH[31];
+			end
+			else if (STEP == 6'd2) begin
+				VAL <= {DVSR[31],DVSR,32'h00000000};
+				NEG <= DVSR[31];
+			end
+//			else if (STEP >= 6'd3 && STEP <= 6'd35) begin
+//				SA <= R;
+//				SB <= D;
+//			end
+			else if (STEP == 6'd36) begin
+				VAL <= R;
+				NEG <= DVDNTH[31];
+			end
+			else if (STEP == 6'd37) begin
+				VAL <= {{33{Q[31]}},Q};
+				NEG <= DVDNTH[31]^DVSR[31];
+			end
 		end
 		else if (EN && CE_R) begin
 			if (STEP != 6'h3F) begin
@@ -57,30 +81,41 @@ module SH7604_DIVU (
 			end
 			if (STEP == 6'h3F && (DIV32_START || DIV64_START)) begin
 				STEP <= 6'd0;
-//				DIV64 <= DIV64_START;
+				DIV64 <= DIV64_START;
+				OVF0 <= 0;
 				OVF <= 0;
 			end
 			
-			SUM = $signed(R) - $signed(D);
+			NRES = (VAL^{65{NEG}}) + {{64{1'b0}},NEG};
 			if (STEP == 6'd0) begin
 				Q <= '0;
-				R <= DVDNTH[31] ? ~{DVDNTH[31],DVDNTH,DVDNTL} + 1 : {DVDNTH[31],DVDNTH,DVDNTL};
-				D <= {DVSR[31] ? ~{DVSR[31],DVSR} + 1 : {DVSR[31],DVSR}, 32'h00000000};
-				
-				if (!DVSR /*|| (DIV64 && DVDNTH >= DVSR)*/) begin
-					OVF <= 1;
-				end
 			end
-			else if (STEP >= 6'd4 && STEP <= 6'd36) begin
+			else if (STEP == 6'd1) begin
+				R <= NRES;
+			end
+			else if (STEP == 6'd2) begin
+				D <= NRES;
+				
+				if (!DVSR) OVF0 <= 1;
+			end
+			else if (STEP >= 6'd3 && STEP <= 6'd35) begin
+				SUM = $signed(R) - $signed(D);
 				R <= !SUM[64] ? SUM : R;
 				Q <= {Q[30:0],~SUM[64]};
 				D <= {D[64],D[64:1]};
 				
-				if (STEP == 6'd5 && OVF) STEP <= 6'd38;
+				if (STEP == 6'd3 && !SUM[64] && DIV64) OVF0 <= 1;
+				if (STEP == 6'd4 && !SUM[64] && DIV64) OVF0 <= 1;
+				if (STEP == 6'd5 && OVF0) begin
+					OVF <= 1; 
+					STEP <= 6'd38;
+				end
+			end
+			else if (STEP == 6'd36) begin
+				R <= NRES;
 			end
 			else if (STEP == 6'd37) begin
-				Q <= DVDNTH[31]^DVSR[31] ? (~Q + 1) : Q;
-				R <= DVDNTH[31] ? (~R + 1) : R;
+				Q <= NRES[31:0];
 			end
 			if (STEP == 6'd38) begin
 				STEP <= 6'h3F;
@@ -99,6 +134,8 @@ module SH7604_DIVU (
 			DVDNTH <= DVDNT_INIT;
 			DVCR <= DVCR_INIT;
 			VCRDIV <= VCRDIV_INIT;
+			DVDNTL2 <= DVDNT_INIT;
+			DVDNTH2 <= DVDNT_INIT;
 			// synopsys translate_off
 			
 			// synopsys translate_on
@@ -110,6 +147,8 @@ module SH7604_DIVU (
 				DVDNTH <= DVDNT_INIT;
 				DVCR <= DVCR_INIT;
 				VCRDIV <= VCRDIV_INIT;
+				DVDNTL2 <= DVDNT_INIT;
+				DVDNTH2 <= DVDNT_INIT;
 			end
 			else if (REG_SEL && IBUS_WE && IBUS_REQ && !OPERATE) begin
 				case ({IBUS_A[4:2],2'b00})
@@ -124,6 +163,8 @@ module SH7604_DIVU (
 					end
 					5'h10: DVDNTH <= IBUS_DI & DVDNT_WMASK;
 					5'h14: DVDNTL <= IBUS_DI & DVDNT_WMASK;
+					5'h18: DVDNTH2 <= IBUS_DI & DVDNT_WMASK;
+					5'h1C: DVDNTL2 <= IBUS_DI & DVDNT_WMASK;
 					default:;
 				endcase
 			end
@@ -132,6 +173,8 @@ module SH7604_DIVU (
 				DVCR.OVF = OVF;
 				DVDNTL <= !OVF || DVCR.OVFIE ? Q : {DVDNTH[31]^DVSR[31],{31{~(DVDNTH[31]^DVSR[31])}}};
 				DVDNTH <= R[31:0];
+				DVDNTL2 <= !OVF || DVCR.OVFIE ? Q : {DVDNTH[31]^DVSR[31],{31{~(DVDNTH[31]^DVSR[31])}}};
+				DVDNTH2 <= R[31:0];
 			end
 		end
 	end
@@ -154,8 +197,8 @@ module SH7604_DIVU (
 					5'h0C: REG_DO <= {16'h0000,VCRDIV} & VCRDIV_RMASK;
 					5'h10: REG_DO <= DVDNTH & DVDNT_RMASK;
 					5'h14: REG_DO <= DVDNTL & DVDNT_RMASK;
-					5'h18: REG_DO <= DVDNTH & DVDNT_RMASK;
-					5'h1C: REG_DO <= DVDNTL & DVDNT_RMASK;
+					5'h18: REG_DO <= DVDNTH2 & DVDNT_RMASK;
+					5'h1C: REG_DO <= DVDNTL2 & DVDNT_RMASK;
 					default:REG_DO <= '0;
 				endcase
 			end

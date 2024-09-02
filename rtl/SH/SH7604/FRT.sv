@@ -13,6 +13,7 @@ module SH7604_FRT (
 	input             FTCI,
 	input             FTI,
 	
+	input             CLK4_CE,
 	input             CLK8_CE,
 	input             CLK32_CE,
 	input             CLK128_CE,

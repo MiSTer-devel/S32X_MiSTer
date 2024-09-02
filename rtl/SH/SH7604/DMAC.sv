@@ -24,7 +24,7 @@ module SH7604_DMAC (
 	input             IBUS_REQ,
 	input             IBUS_BURST,
 	input             IBUS_LOCK,
-	output reg        IBUS_BUSY,
+	output            IBUS_BUSY,
 	output            IBUS_ACT,
 	
 	output     [31:0] DBUS_A,
@@ -37,13 +37,14 @@ module SH7604_DMAC (
 	output            DBUS_BURST,
 	input             DBUS_WAIT,
 	
+	input             EBUS_END,
+	
 	input             BSC_ACK,
 	
 	output            DMAC0_IRQ,
 	output      [7:0] DMAC0_VEC,
 	output            DMAC1_IRQ,
 	output      [7:0] DMAC1_VEC
-	
 );
 
 	import SH7604_PKG::*;
@@ -187,16 +188,14 @@ module SH7604_DMAC (
 		bit  [31:0] AR_INC;
 		bit  [23:0] TCR_NEXT;
 		bit         RD_BUF_LATCH;
+		bit         CHCR_TE_OLD[2];
 		
 		if (!RST_N) begin
-			SAR[0] <= SARx_INIT;
-			SAR[1] <= SARx_INIT;
-			DAR[0] <= DARx_INIT;
-			DAR[1] <= DARx_INIT;
-			TCR[0] <= TCRx_INIT;
-			TCR[1] <= TCRx_INIT;
-			CHCR[0] <= CHCRx_INIT;
-			CHCR[1] <= CHCRx_INIT;
+			SAR <= '{2{SARx_INIT}};
+			DAR <= '{2{DARx_INIT}};
+			TCR <= '{2{TCRx_INIT}};
+			CHCR <= '{2{CHCRx_INIT}};
+			CHCR_TE_OLD <= '{2{1'b0}};
 			
 			DMA_WR <= 0;
 			DMA_RD <= 0;
@@ -214,7 +213,7 @@ module SH7604_DMAC (
 			CH_REQ_CLR[0] <= 0;
 			CH_REQ_CLR[1] <= 0;
 			DMA_REQ_CLR <= 0;
-			if (DMA_REQ && !DMA_RD && !DMA_WR && !DBUS_WAIT && !IBUS_LOCK && CE_F) begin
+			if (DMA_REQ && !DMA_RD && !DMA_WR && (!DBUS_WAIT || EBUS_END) && !IBUS_LOCK && CE_F) begin
 				if (!CHCR[DMA_CH].TA || (CHCR[DMA_CH].TA && !CHCR[DMA_CH].AM)) begin
 					DMA_RD <= 1;
 					LW_CNT <= &CHCR[DMA_CH].TS ? 2'd3 : 2'd0;
@@ -317,7 +316,7 @@ module SH7604_DMAC (
 						6'h08: TCR[0]  <= IBUS_DI[23:0];
 						6'h0C: begin
 							CHCR[0][31:2] <= IBUS_DI[31:2] & CHCRx_WMASK[31:2];
-							CHCR[0][1] <= CHCR[0][1] & IBUS_DI[1];
+							if (!IBUS_DI[1] && CHCR_TE_OLD[0]) begin CHCR[0][1] <= 0; CHCR_TE_OLD[0] <= 0; end
 							CHCR[0][0] <= IBUS_DI[0] & CHCRx_WMASK[0];
 						end
 						6'h10: SAR[1]  <= IBUS_DI;
@@ -325,10 +324,18 @@ module SH7604_DMAC (
 						6'h18: TCR[1]  <= IBUS_DI[23:0];
 						6'h1C: begin
 							CHCR[1][31:2] <= IBUS_DI[31:2] & CHCRx_WMASK[31:2];
-							CHCR[1][1]    <= CHCR[1][1] & IBUS_DI[1];
-							CHCR[1][0]    <= IBUS_DI[0] & CHCRx_WMASK[0];
+							if (!IBUS_DI[1] && CHCR_TE_OLD[1]) begin CHCR[1][1] <= 0; CHCR_TE_OLD[1] <= 0; end
+							CHCR[1][0] <= IBUS_DI[0] & CHCRx_WMASK[0];
 						end
 						default:;
+					endcase
+				end
+			end
+			if (CE_F) begin
+				if (REG2_SEL && !IBUS_WE && IBUS_REQ) begin
+					case ({IBUS_A[5:2],2'b00})
+						6'h0C: CHCR_TE_OLD[0] <= CHCR[0].TE;
+						6'h1C: CHCR_TE_OLD[1] <= CHCR[1].TE;
 					endcase
 				end
 			end
@@ -378,7 +385,6 @@ module SH7604_DMAC (
 	assign DMAC0_VEC = VCRDMA0.VC;
 	assign DMAC1_IRQ = CHCR[1].TE & CHCR[1].IE;
 	assign DMAC1_VEC = VCRDMA1.VC;
-	
 	
 	//Registers
 	always @(posedge CLK or negedge RST_N) begin
