@@ -346,8 +346,9 @@ always @(posedge RESET or posedge CLK) begin
 
 	if(RESET) begin
 		DTACK_N <= 1;
-		TH   <= 0;
+		TH   <= 1;
 		JCNT <= 0;
+		THd   <= 1;
 	end
 	else if(CE) begin
 	
