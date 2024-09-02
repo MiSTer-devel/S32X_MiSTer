@@ -178,7 +178,8 @@ module VDP
 	bit [10:0] VSCRLB;
 	bit  [8:0] DISP_X;
 	bit [15:0] SPR_VRAM_ADDR;
-	bit        DISP_EN_PIPE[6];
+	bit        DISP;
+	bit        DISP_EN_PIPE[3];
 	
 	bit        VINT_FLAG;
 	bit        HINT_FLAG;
@@ -1000,7 +1001,7 @@ module VDP
 	wire SLOT_CE = DCLK_CE & H_CNT[0];
 	
 	always_comb begin
-		if (IN_VBL || !MR2.DISP)
+		if (IN_VBL || !DISP)
 			if (H_CNT[5:1] == 5'b11001)
 				SLOT_PIPE[0] = ST_REFRESH;
 			else
@@ -1663,24 +1664,28 @@ module VDP
 		end
 	end
 
+	bit  [7:0] DISP_SR;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
-			DISP_EN_PIPE <= '{6{0}};
+			DISP_EN_PIPE <= '{3{0}};
+			DISP_SR <= '0;
 		end else begin
 			if (ENABLE && DCLK_CE) begin
 				if ((H_CNT == 9'h013 && !H40) || (H_CNT == 9'h013 && H40))
-					DISP_EN_PIPE[0] <= MR2.DISP & ~IN_VBL;
+					DISP_EN_PIPE[0] <= ~IN_VBL;
 				else if ((H_CNT == 9'h113 && !H40) || (H_CNT == 9'h153 && H40))
 					DISP_EN_PIPE[0] <= 0;
 				
 				DISP_EN_PIPE[1] <= DISP_EN_PIPE[0];
 				DISP_EN_PIPE[2] <= DISP_EN_PIPE[1];
-				DISP_EN_PIPE[3] <= DISP_EN_PIPE[2];
-				DISP_EN_PIPE[4] <= DISP_EN_PIPE[3];
-				DISP_EN_PIPE[5] <= DISP_EN_PIPE[4];
+			end
+			
+			if (ENABLE && SC_CE) begin
+				DISP_SR <= {DISP_SR[6:0],MR2.DISP};
 			end
 		end
 	end
+	assign DISP = DISP_SR[7];
 	
 	always @(posedge CLK or negedge RST_N) begin
 		BGTile_t   BGA_TILE[4];
@@ -1787,7 +1792,9 @@ module VDP
 						PIX_MODE_TEMP = PIX_NORMAL;
 					
 					PIX_MODE_PIPE[0] <= PIX_MODE_TEMP;
-					if (MR4.STE && (SPR_PRIO || ((!BGA_PRIO || BGA_COL == 4'b0000) && (!BGB_PRIO || BGB_COL == 4'b0000)))) begin
+					if (!DISP) begin
+						PIX_MODE_PIPE[0] <= PIX_NORMAL;
+					end else if (MR4.STE && (SPR_PRIO || ((!BGA_PRIO || BGA_COL == 4'b0000) && (!BGB_PRIO || BGB_COL == 4'b0000)))) begin
 						//sprite is visible
 						if (SPR_COL_30)
 							//if sprite is palette 3/color 14 increase intensity
@@ -1810,7 +1817,9 @@ module VDP
 						2'b11: PAL_COL_DBG = {BGB_PAL,BGB_COL};
 					endcase
 
-					if (DBG[6])
+					if (!DISP)
+						CRAM_ADDR_A <= {BGC.PAL,BGC.COL};
+					else if (DBG[6])
 						CRAM_ADDR_A <= PAL_COL_DBG;
 					else if (DBG[8:7] != 2'b00)
 						CRAM_ADDR_A <= PAL_COL & PAL_COL_DBG;
