@@ -483,7 +483,7 @@ module S32X_VDP
 	assign B = PIX_COLOR[14:10] & {5{HDISP[2]&~VBLK}};
 	assign HS_N = HSYNC_N_SYNC & VSYNC_N_SYNC;
 	assign VS_N = VSYNC_N_SYNC;
-	assign YSO_N = ~((PRI ^ PIX_COLOR[15]) & |MODE) & YS_N_SYNC;
+	assign YSO_N = !MODE ? 1'b1 : ~(PRI ^ PIX_COLOR[15]) & YS_N_SYNC;
 	
 	always @(posedge CLK) FB_DISP_RD <= DOT_CE | USE_ASYNC_FB;
 	

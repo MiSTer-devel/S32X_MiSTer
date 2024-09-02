@@ -129,7 +129,7 @@ module S32X_IF
 	bit [15:0] FIFO_BUF[8];
 	bit  [2:0] FIFO_WR_POS;
 	bit  [2:0] FIFO_RD_POS;
-	bit  [2:0] FIFO_AMOUNT;
+	bit  [3:0] FIFO_AMOUNT;
 	bit        FIFO_FULL;
 	bit        FIFO_EMPTY;
 	bit        FIFO_REQ, FIFO_REQ2, FIFO_REQ3;
@@ -156,16 +156,14 @@ module S32X_IF
 	bit        SH_ROM_WAIT;
 	bit        SH_ROM_GRANT;
 	
-	typedef enum bit [8:0] {
-		RS_IDLE    = 9'b000000001,
-		RS_MD_RW   = 9'b000000010, 
-		RS_MD_WAIT = 9'b000000100, 
-		RS_MD_READ = 9'b000001000, 
-		RS_SH_RW   = 9'b000010000, 
-		RS_SH_WAIT = 9'b000100000, 
-		RS_SH_READ = 9'b001000000,
-		RS_MD_END  = 9'b010000000,
-		RS_SH_END  = 9'b100000000
+	typedef enum bit [2:0] {
+		RS_IDLE,
+		RS_MD_WAIT, 
+		RS_MD_READ, 
+		RS_SH_WAIT, 
+		RS_SH_READ,
+		RS_MD_END,
+		RS_SH_END
 	} ROMState_t;
 	ROMState_t ROM_ST;
 	
@@ -273,7 +271,7 @@ module S32X_IF
 			FIFO_RD_POS <= '0;
 			FIFO_AMOUNT <= '0;
 			FIFO_FULL <= 0;
-			FIFO_EMPTY <= 0;
+			FIFO_EMPTY <= 1;
 			FIFO_REQ_AVAIL <= 0;
 			FIFO_REQ_PEND <= 0;
 			FIFO_REQ <= 0;
@@ -335,7 +333,7 @@ module S32X_IF
 								FIFO_RD_POS <= '0;
 								FIFO_AMOUNT <= '0;
 								FIFO_FULL <= 0;
-								FIFO_EMPTY <= 0;
+								FIFO_EMPTY <= 1;
 								FIFO_REQ <= 0;
 							end
 						end
@@ -358,7 +356,7 @@ module S32X_IF
 							if (DCR.M68S) begin
 								DLR <= DLR_NEXT;
 								if (!DLR_NEXT) DCR.M68S <= 0;
-								FIFO_BUF[FIFO_WR_POS] <= VDI;
+								FIFO_BUF[FIFO_WR_POS] <= VDI_SYNC;
 								FIFO_WR_POS <= FIFO_WR_POS + 3'd1;
 								if (FIFO_WR_POS[1:0] == 2'd3) begin
 									FIFO_REQ_AVAIL <= 1;
@@ -442,7 +440,7 @@ module S32X_IF
 						6'h00: MD_REG_DO <= ADCR & ADCR_MASK;
 						6'h02: MD_REG_DO <= ICR & ICR_MASK;
 						6'h04: MD_REG_DO <= BSR & BSR_MASK;
-						6'h06: MD_REG_DO <= (DCR & DCR_MASK) | {8'h00,FIFO_FULL,7'h00};
+						6'h06: MD_REG_DO <= (DCR & DCR_MASK) | {8'h00,/*(FIFO_AMOUNT >= 3'd4)*/FIFO_FULL,7'h00};
 						6'h08: MD_REG_DO <= {8'h00,DSAR[23:16] & DSAR_MASK[23:16]};
 						6'h0A: MD_REG_DO <= DSAR[15:0] & DSAR_MASK[15:0];
 						6'h0C: MD_REG_DO <= {8'h00,DDAR[23:16] & DDAR_MASK[23:16]};
@@ -618,7 +616,7 @@ module S32X_IF
 						6'h12: begin
 							SH_REG_DO <= FIFO_BUF[FIFO_RD_POS]; 
 							FIFO_RD_POS <= FIFO_RD_POS + 3'd1;
-							if (FIFO_RD_POS[1:0] == 2'd3) begin
+							if (FIFO_RD_POS[1:0] == 2'd3 && FIFO_AMOUNT <= 4'd4) begin
 								FIFO_REQ_AVAIL <= 0;
 							end
 							FIFO_DEC_AMOUNT = 1;
@@ -667,12 +665,12 @@ module S32X_IF
 			
 			//DREQ
 			if (FIFO_INC_AMOUNT && !FIFO_DEC_AMOUNT) begin
-				if (FIFO_AMOUNT == 3'd7) FIFO_FULL <= 1;
-				else FIFO_AMOUNT <= FIFO_AMOUNT + 3'd1;
+				if (FIFO_AMOUNT == 4'd7) FIFO_FULL <= 1;
+				if (FIFO_AMOUNT != 4'd8) FIFO_AMOUNT <= FIFO_AMOUNT + 4'd1;
 				FIFO_EMPTY <= 0;
 			end else if (!FIFO_INC_AMOUNT && FIFO_DEC_AMOUNT) begin
-				if (FIFO_AMOUNT == 3'd0) FIFO_EMPTY <= 1;
-				else FIFO_AMOUNT <= FIFO_AMOUNT - 3'd1;
+				if (FIFO_AMOUNT == 4'd1) FIFO_EMPTY <= 1;
+				if (FIFO_AMOUNT != 4'd0) FIFO_AMOUNT <= FIFO_AMOUNT - 4'd1;
 				FIFO_FULL <= 0;
 			end
 			
@@ -841,18 +839,15 @@ module S32X_IF
 						S32X_UWR <= ~SHDQMLU_N;
 						S32X_CAS0 <= ~SHRD_N;
 						SH_ROM_GRANT <= 1;
-						ROM_ST <= RS_SH_WAIT;//RS_SH_RW;;
+						ROM_ST <= RS_SH_WAIT;
 					end else if (MD_ROM_WAIT && ADCR.ADEN && !DCR.RV) begin
 						S32X_CE0 <= 1;
-						ROM_ST <= RS_MD_RW;
+						S32X_LWR <= ~LWR_V;
+						S32X_UWR <= ~UWR_V;
+						S32X_CAS0 <= ~CAS0_V;
+						ROM_ST <= RS_MD_WAIT;
 					end
 //					ROM_WAIT_CNT <= '0;
-				end
-				
-				RS_SH_RW: begin
-					if (CE_F) begin
-						ROM_ST <= RS_SH_WAIT;
-					end
 				end
 				
 				RS_SH_WAIT: begin
@@ -879,13 +874,6 @@ module S32X_IF
 						SH_ROM_GRANT <= 0;
 						ROM_ST <= RS_IDLE;
 					end
-				end
-				
-				RS_MD_RW: begin
-					S32X_LWR <= ~LWR_V;
-					S32X_UWR <= ~UWR_V;
-					S32X_CAS0 <= ~CAS0_V;
-					ROM_ST <= USE_ROM_WAIT ? RS_MD_WAIT : RS_MD_READ;
 				end
 				
 				RS_MD_WAIT: begin
@@ -1030,11 +1018,9 @@ module S32X_IF
 	
 	assign DTACK_N = MD_REG_DTACK_N & MD_ROM_DTACK_N & VDP_DTACK_N & ~MD_32XID_SEL & ~(MD_BIOS_SEL & ~CE0_N_SYNC[0] & ~AS_N_SYNC[0]);
 	
-	assign SHDO = SH_ROM_SEL    ? SH_ROM_DO : 
-	              SH_VDP_SEL    ? VDP_DI : 
-					  SH_SYSREG_SEL ? SH_REG_DO : 
-					  SH_BIOS_SEL   ? SH_REG_DO : 
-					                  16'h0000;
+	assign SHDO = SH_ROM_SEL ? SH_ROM_DO : 
+	              SH_VDP_SEL ? VDP_DI : 
+					  SH_SYSREG_SEL || SH_BIOS_SEL ? SH_REG_DO : 16'h0000;
 	assign SHWAIT_N = ~SH_ROM_WAIT & ~SH_VDP_WAIT /*& ~SH_SYSREG_WAIT*/;
 	
 	assign SHRES_N = ADCR.RES /*| ~ADCR.REN*/;
