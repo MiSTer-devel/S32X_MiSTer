@@ -138,7 +138,7 @@ module S32X
 	bit         TXDS;
 	bit         SCKM;
 	bit         SCKS;
-	SH7604 MSH
+	SH7604 #(.BUS_AREA_TIMIMG(4'b1000), .BUS_SIZE_BYTE_DISABLE(1)) MSH
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
@@ -189,10 +189,12 @@ module S32X
 		
 		.FTOA(SHMFTOA),
 		
-		.MD(6'b001000)
+		.MD(6'b001000),
+		
+		.FAST(0)
 	);
 	
-	SH7604 SSH
+	SH7604 #(.BUS_AREA_TIMIMG(4'b1000), .BUS_SIZE_BYTE_DISABLE(1)) SSH
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
@@ -243,7 +245,9 @@ module S32X
 		
 		.FTOA(SHSFTOA),
 		
-		.MD(6'b101000)
+		.MD(6'b101000),
+		
+		.FAST(0)
 	);
 	
 	
