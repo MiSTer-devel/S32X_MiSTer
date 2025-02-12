@@ -431,6 +431,7 @@ module SH7604_CACHE (
 	bit         IBUS_READARRAY;
 	always @(posedge CLK or negedge RST_N) begin
 		bit [ 1: 0] ARRAY_POS;
+		bit         IBUS_END;
 		
 		if (!RST_N) begin
 			IBADDR <= '0;
@@ -497,11 +498,12 @@ module SH7604_CACHE (
 					CACHE_UPDATE <= 1;
 				end
 			end
+			IBUS_END = 0;//(IBREQ && IBUS_WRITE && !IBUS_WAIT);
 			
 			if (CBUS_REQ) begin
 				if (CBUS_WR) begin
 					if ((CACHE_AREA || NOCACHE_AREA || IO_AREA)) begin
-						if (!IBREQ) begin
+						if (!IBREQ || IBUS_END) begin
 							IBADDR <= CBUS_A;
 							IBDATA <= CBUS_DI;
 							IBBA <= CBUS_BA;
@@ -516,7 +518,7 @@ module SH7604_CACHE (
 						end
 					end
 					
-					if (CACHE_AREA && HIT && CCR.CE && !IBREQ) begin
+					if (CACHE_AREA && HIT && CCR.CE && (!IBREQ || IBUS_END)) begin
 						CACHE_WR_ADDR <= CBUS_A[28:2];
 						CACHE_WR_BA <= CBUS_BA;
 						CACHE_WR_WAY <= WAY_HIT;
@@ -541,7 +543,7 @@ module SH7604_CACHE (
 				end
 				else begin
 					if (((CACHE_AREA && (!CCR.CE || CBUS_TAS)) || NOCACHE_AREA || IO_AREA) && !IBUS_READ) begin
-						if (!IBREQ) begin
+						if (!IBREQ || IBUS_END) begin
 							IBADDR <= CBUS_A;
 							IBBA <= CBUS_BA;
 							IBWE <= 0;
@@ -561,7 +563,7 @@ module SH7604_CACHE (
 							CACHE_READ <= 1;
 						end
 						else begin
-							if (!IBREQ) begin
+							if (!IBREQ || IBUS_END) begin
 								IBADDR <= {CBUS_A[31:4],CBUS_A[3:2] + 2'd1,2'b00};
 								IBBA <= 4'b1111;
 								IBWE <= 0;
@@ -612,7 +614,7 @@ module SH7604_CACHE (
 	assign IBUS_BA = IBBA;
 	assign IBUS_WE = IBWE;
 	assign IBUS_REQ = IBREQ;
-	assign IBUS_PREREQ = CBUS_REQ && ((CBUS_WR && (CACHE_AREA || NOCACHE_AREA)) || (!CBUS_WR && ((CACHE_AREA && (!CCR.CE || CBUS_TAS)) || NOCACHE_AREA)) || (!CBUS_WR && CACHE_AREA && CCR.CE && !HIT)) && !IBREQ;
+	assign IBUS_PREREQ = CBUS_REQ && ((!CBUS_WR && ((CACHE_AREA && (!CCR.CE || CBUS_TAS)) || NOCACHE_AREA)) || (!CBUS_WR && CACHE_AREA && CCR.CE && !HIT)) && !IBREQ;
 	assign IBUS_BURST = IBBURST; 
 	assign IBUS_LOCK = IBLOCK;
 
