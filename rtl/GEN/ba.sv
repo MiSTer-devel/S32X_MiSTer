@@ -761,7 +761,7 @@ module BA
 			else if (!Z80_BGACK_N && !Z80_AS_N && !Z80_WAIT_N && !Z80_WAIT_DELAY && M68K_CLKENp) begin
 				Z80_WAIT_DELAY <= 1;
 			end
-			else if (!Z80_BGACK_N && !Z80_WAIT_N && Z80_WAIT_DELAY && M68K_CLKENp) begin
+			else if (!Z80_BGACK_N && !Z80_WAIT_N && Z80_WAIT_DELAY && !Z80_MBUS_DTACK_N && M68K_CLKENp) begin
 				Z80_WAIT_N <= 1;
 				Z80_WAIT_DELAY <= 0;
 			end
