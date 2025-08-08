@@ -121,7 +121,7 @@ module SH_core
 		else if (EN && CE) begin
 			if (PIPE.EX.DI.PCW && !EX_STALL) begin
 				NPC <= ALU_RES;
-			end else if (!PC_STALL && !SLP) begin
+			end else if (!PC_STALL && !ID_DECI.SLP && !SLP) begin
 				NPC <= PC + 2;
 			end
 		end
@@ -132,7 +132,7 @@ module SH_core
 	wire LOAD_ISSUE = (PIPE.EX.DI.MEM.R | PIPE.EX.DI.MAC.R) & ((PIPE.EX.DI.RA.N == ID_DECI.RA.N & ID_DECI.RA.R) |
 	                                                           (PIPE.EX.DI.RA.N == ID_DECI.RB.N & ID_DECI.RB.R) |
 	                                                           (PIPE.EX.DI.RA.N ==         5'd0 & ID_DECI.R0R));
-	wire INST_ISSUE = ((IFID_STALL & ~PC[1]) | ~PIPE.ID.PC[1]) & (PIPE.EX.DI.MEM.R | PIPE.EX.DI.MEM.W | PIPE.EX.DI.MAC.R | PIPE.EX.DI.MAC.W);
+	wire INST_ISSUE = ((IFID_STALL & ~PC[1]) | ~PIPE.ID.PC[1]) & (PIPE.EX.DI.MEM.R | PIPE.EX.DI.MEM.W | PIPE.EX.DI.MAC.R | PIPE.EX.DI.MAC.W) & ~(ID_DECI.BR.BI & ID_DECI.BR.BT == UCB & ID_DECI.IMMT == SIMM12);
 	
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
@@ -228,7 +228,7 @@ module SH_core
 				NEW_IR = SAVE_IR;
 			end
 			
-			if (SLP) begin
+			if (ID_DECI.SLP || SLP) begin
 				NEW_IR = 16'h0009;
 			end
 				
