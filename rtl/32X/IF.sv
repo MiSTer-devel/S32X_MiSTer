@@ -1053,11 +1053,11 @@ module S32X_IF
 	end
 	
 	assign CDO = VDI;
-	assign CASEL_N = ADCR.ADEN && !DCR.RV && S32X_CE0 ? ~S32X_CE0 : ASEL_N;
-	assign CLWR_N  = ADCR.ADEN && !DCR.RV && S32X_CE0 ? ~S32X_LWR : LWR_N;
-	assign CUWR_N  = ADCR.ADEN && !DCR.RV && S32X_CE0 ? ~S32X_UWR : UWR_N;
-	assign CCE0_N  = ADCR.ADEN && !DCR.RV && S32X_CE0 ? ~S32X_CE0 : MD_BIOS_SEL | (MD_ROM_SEL & !DCR.RV) | CE0_N;
-	assign CCAS0_N = ADCR.ADEN && !DCR.RV && S32X_CE0 ? ~S32X_CAS0 : CAS0_N;
+	assign CASEL_N = ADCR.ADEN && S32X_CE0 ? ~S32X_CE0 : ASEL_N;
+	assign CLWR_N  = ADCR.ADEN && S32X_CE0 ? ~S32X_LWR : LWR_N;
+	assign CUWR_N  = ADCR.ADEN && S32X_CE0 ? ~S32X_UWR : UWR_N;
+	assign CCE0_N  = ADCR.ADEN && S32X_CE0 ? ~S32X_CE0 : MD_BIOS_SEL | (MD_ROM_SEL & !DCR.RV) | CE0_N;
+	assign CCAS0_N = ADCR.ADEN && S32X_CE0 ? ~S32X_CAS0 : CAS0_N;
 	assign CCAS2_N = CAS2_N;
 	
 	assign SEL = SH_ROM_GRANT;
