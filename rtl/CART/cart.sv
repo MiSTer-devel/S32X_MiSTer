@@ -254,7 +254,7 @@ module CART
 	assign SRAM_WR = SRAM_ACCESS & ~LWR_N;
 	
 	assign VDO = EEPROM_EN ? EEPROM_DO : 
-	             !TIME_N ? (sf_map[1:0] == 2'd3 ? SF004_DO : 16'h0000) :
+	             !TIME_N && CE0_N ? (sf_map[1:0] == 2'd3 ? SF004_DO : 16'h0000) :
 					 SRAM_ACCESS ? {8'hFF,SRAM_DI} : 
 					 ROM_ACCESS ? ROM_DI : 
 	             16'h0000;
