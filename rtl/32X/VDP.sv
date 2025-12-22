@@ -40,12 +40,14 @@ module S32X_VDP
 	output      [1:0] FB1_WE,
 	output            FB1_RD,
 	
+	output            DOT_CE,
 	output      [4:0] R,
 	output      [4:0] G,
 	output      [4:0] B,
 	output            HS_N,
 	output            VS_N,
 	output            YSO_N,	//0 - 32X pixel, 1 - MD pixel
+	output            HBL,
 	
 	output      [7:0] DBG_DOT_TIME
 );
@@ -58,7 +60,7 @@ module S32X_VDP
 	AFDR_t     AFDR;
 	FBCR_t     FBCR;
 	
-	bit        DOT_CE;
+//	bit        DOT_CE;
 	bit  [1:0] MODE;
 	bit        PRI;
 	bit        M240;
@@ -260,9 +262,11 @@ module S32X_VDP
 	bit        DOT_CLK;
 	bit        EDCLK_OLD;
 	always @(posedge CLK or negedge RST_N) begin
-		bit        HSYNC_N_OLD;
-		bit        VSYNC_N_OLD;
-		bit        VSYNC_OCCUR;
+		bit         HSYNC_N_OLD,HSYNC_N_OLD2;
+		bit         VSYNC_N_OLD;
+		bit         VSYNC_OCCUR;
+		bit [ 8: 0] HSYNC_CYCLE_CNT;
+		bit         H32_HACK;
 		
 		if (!RST_N) begin
 			DOT_CLK <= 0;
@@ -270,19 +274,27 @@ module S32X_VDP
 			V_CNT <= '0;
 			HSYNC_N_OLD <= 1;
 			VSYNC_N_OLD <= 1;
+			VINT <= 0;
 		end
 		else begin
 			DBG_DOT_TIME <= DBG_DOT_TIME + 8'd1;
+			
+			HSYNC_N_OLD2 <= HSYNC_N_SYNC;
+			if (!HSYNC_N_SYNC && HSYNC_CYCLE_CNT < 9'd300) HSYNC_CYCLE_CNT <= HSYNC_CYCLE_CNT + 9'd1;
+			if (HSYNC_N_SYNC && !HSYNC_N_OLD2 && VSYNC_N_SYNC) begin
+				H32_HACK <= (HSYNC_CYCLE_CNT < 9'd280);
+				HSYNC_CYCLE_CNT <= 9'd0;
+			end
 			
 			EDCLK_OLD <= EDCLK_SYNC;
 			if (!EDCLK_SYNC && EDCLK_OLD) begin
 				DOT_CLK <= ~DOT_CLK;
 				HSYNC_N_OLD <= HSYNC_N_SYNC;
 				if (!HSYNC_N_SYNC && HSYNC_N_OLD && (H_CNT >= 9'h160 || VSYNC_N_SYNC)) begin
-					H_CNT <= 9'h1CE;
+					H_CNT <= H32_HACK ? 9'h1C5 : 9'h1CE;
 					DOT_CLK <= 1;
 				end else if (H_CNT == 9'h16C && DOT_CLK) begin
-					H_CNT <= 9'h1C9;
+					H_CNT <= H32_HACK ? 9'h1C2 : 9'h1C9;
 				end else if (DOT_CLK) begin
 					H_CNT <= H_CNT + 9'd1;
 				end
@@ -300,6 +312,12 @@ module S32X_VDP
 						V_CNT <= 9'd0;
 					end else begin
 						V_CNT <= V_CNT + 9'd1;
+					end
+					
+					if ((V_CNT == 9'd223 && (!M240 || !PAL)) || (V_CNT == 9'd239 && M240 && PAL)) begin
+						VINT <= 1;
+					end else if ((V_CNT == 9'd261 && !PAL) || (V_CNT == 9'd312 && PAL)) begin
+						VINT <= 0;
 					end
 				end
 				
@@ -331,7 +349,7 @@ module S32X_VDP
 			HDISP[2] <= HDISP[1];
 			
 			if (H_CNT == 9'h1CE-1) begin
-				if ((V_CNT == 9'd224 && (!M240 || !PAL)) || (V_CNT == 9'd240 && M240 && PAL)) begin
+				if ((V_CNT >= 9'd224 && (!M240 || !PAL)) || (V_CNT >= 9'd240 && M240 && PAL)) begin
 					VBLK <= 1;
 				end else if (V_CNT == 9'd0) begin
 					VBLK <= 0;
@@ -339,6 +357,8 @@ module S32X_VDP
 			end
 		end
 	end
+	
+	assign HINT = HBLK;
 	
 	always @(posedge CLK or negedge RST_N) begin
 		bit  [5:0] RFRH_CNT;
@@ -484,6 +504,7 @@ module S32X_VDP
 	assign HS_N = HSYNC_N_SYNC & VSYNC_N_SYNC;
 	assign VS_N = VSYNC_N_SYNC;
 	assign YSO_N = !MODE ? 1'b1 : ~(PRI ^ PIX_COLOR[15]) & YS_N_SYNC;
+	assign HBL = ~HDISP[2];
 	
 	always @(posedge CLK) FB_DISP_RD <= DOT_CE | USE_ASYNC_FB;
 	
@@ -505,8 +526,5 @@ module S32X_VDP
 	assign FB1_DO = FB_DRAW_D;
 	assign FB1_WE = FS ? 2'b00      : FB_DRAW_WE;
 	assign FB1_RD = FS ? FB_DISP_RD : FB_DRAW_RD;
-	
-	assign HINT = HBLK;
-	assign VINT = VBLK;
 	
 endmodule

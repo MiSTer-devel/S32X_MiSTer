@@ -57,12 +57,14 @@ module S32X
 	output      [1:0] FB1_WE,
 	output            FB1_RD,
 	
+	output            DOT_CE,
 	output      [4:0] R,
 	output      [4:0] G,
 	output      [4:0] B,
 	output            HS_N,
 	output            VS_N,
 	output            YSO_N,
+	output            HBL,
 	
 	output     [15:0] PWM_L,
 	output     [15:0] PWM_R,
@@ -399,12 +401,14 @@ module S32X
 		.FB1_WE(FB1_WE),
 		.FB1_RD(FB1_RD),
 		
+		.DOT_CE(DOT_CE),
 		.R(R),
 		.G(G),
 		.B(B),
 		.HS_N(HS_N),
 		.VS_N(VS_N),
-		.YSO_N(YSO_N)
+		.YSO_N(YSO_N),
+		.HBL(HBL)
 	);
 	
 	assign DBG_CA = {CA,1'b0};

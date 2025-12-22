@@ -88,7 +88,7 @@ module gen
 	output        HS,
 	output        HBL,
 	output        VBL,
-	output        CE_PIX,
+	output        DOT_CE,
 	input         BORDER,
 
 	output        INTERLACE,
@@ -526,7 +526,7 @@ VDP vdp
 	.EDCLK(EDCLK),
 	.HS_N(HS),
 	.VS_N(VS),
-	.CE_PIX(CE_PIX),
+	.CE_PIX(DOT_CE),
 	.HBL(HBL),
 	.VBL(VBL),
 	

@@ -545,6 +545,8 @@ wire        GEN_LWR_N, GEN_UWR_N, GEN_CAS0_N;
 wire        GEN_ROM_CE_N;
 wire        GEN_RAM_CE_N;
 wire        GEN_TIME_N;
+wire        GEN_DOT_CE;
+wire        GEN_HBLANK;
 
 //wire [15:0] GEN_MEM_DO;
 wire        GEN_MEM_BUSY;
@@ -603,10 +605,10 @@ gen gen
 	.EDCLK(EDCLK),
 	.VS(vs),
 	.HS(hs),
-	.HBL(hblank),
+	.HBL(GEN_HBLANK),
 	.VBL(vblank),
 	.BORDER(status[29]),
-	.CE_PIX(ce_pix),
+	.DOT_CE(GEN_DOT_CE),
 	.FIELD(VGA_F1),
 	.INTERLACE(interlace),
 	.RESOLUTION(resolution),
@@ -707,10 +709,12 @@ wire [15:0] S32X_FB1_DO;
 wire  [1:0] S32X_FB1_WE;
 wire        S32X_FB1_RD;
 	
+wire        S32X_DOT_CE;
 wire  [4:0] S32X_R;
 wire  [4:0] S32X_G;
 wire  [4:0] S32X_B;
 wire        S32X_YSO_N;
+wire        S32X_HBLANK;
 
 wire [15:0] S32X_SL;
 wire [15:0] S32X_SR;
@@ -775,10 +779,12 @@ S32X #(
 	.FB1_WE(S32X_FB1_WE),
 	.FB1_RD(S32X_FB1_RD),
 	
+	.DOT_CE(S32X_DOT_CE),
 	.R(S32X_R),
 	.G(S32X_G),
 	.B(S32X_B),
 	.YSO_N(S32X_YSO_N),
+	.HBL(S32X_HBLANK),
 
 	.PWM_L(S32X_SL),
 	.PWM_R(S32X_SR)
@@ -1020,6 +1026,9 @@ always_comb begin
 		b = !S32X_YSO_N ? {S32X_B,S32X_B[4:2]} : color_lut[GEN_B];
 	end
 end
+
+assign hblank = s32x_rom ? S32X_HBLANK : GEN_HBLANK;
+assign ce_pix = s32x_rom ? S32X_DOT_CE : GEN_DOT_CE;
 
 /////////////////////////////////////////////////////////////
 reg TRANSP_DETECT = 0;
