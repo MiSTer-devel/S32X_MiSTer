@@ -727,7 +727,7 @@ module VDP
 	wire  [8:0] CRAM_D = {IO_DATA[11:9],IO_DATA[7:5],IO_DATA[3:1]};
 	wire        CRAM_WE = ((IO_WE && FIFO_CODE == 4'b0011) || (DMA_FILL_WE && DMA_FILL_CODE == 4'b0011)) && SLOT == ST_EXT && SLOT_CE;
 	wire  [8:0] CRAM_Q_B;
-	dpram #(6,9) CRAM
+	vdp_cram CRAM
 	(
 		.clock(CLK),
 		.data_b(CRAM_D),
@@ -745,7 +745,7 @@ module VDP
 	wire [10:0] VSRAM_D = IO_DATA[10:0];
 	wire        VSRAM_WE = ((IO_WE && FIFO_CODE == 4'b0101) || (DMA_FILL_WE && DMA_FILL_CODE == 4'b0101)) && SLOT == ST_EXT && SLOT_CE;
 	wire [10:0] VSRAM_Q_B;
-	dpram_dif #(5,22,6,11) VSRAM
+	vdp_vsram VSRAM
 	(
 		.clock(CLK),
 		.data_b(VSRAM_D),
@@ -1363,31 +1363,31 @@ module VDP
 	wire  [6:0] OBJVI_D = OBJ_N;
 	wire        OBJVI_WE = OBJ_FIND && (OBJVI_ADDR_WR < OBJ_MAX_CNT) && SLOT == ST_SPRCHAR && DCLK_CE;
 	wire  [6:0] OBJVI_Q;
-	mlab #(6,7) obj_visinfo
+	vdp_obj_visinfo OBJ_VISINFO
 	(
 		.clock(CLK),
-		.rdaddress(OBJVI_ADDR_RD),
-		.q(OBJVI_Q),
-		.wraddress(OBJVI_ADDR_WR),
-		.data(OBJVI_D),
-		.wren(OBJVI_WE)
+		.address_a(OBJVI_ADDR_RD),
+		.q_a(OBJVI_Q),
+		.address_b(OBJVI_ADDR_WR),
+		.data_b(OBJVI_D),
+		.wren_b(OBJVI_WE)
 	);
-	
+
 	bit   [5:0] OBJSI_ADDR_RD;
 	bit   [5:0] OBJSI_ADDR_WR;
 	wire [34:0] OBJSI_D = {VRAM_SDATA[24:0], OBJC_Q[27:24], OBJC_Y_OFS};
 	wire        OBJSI_WE = (OBJVI_ADDR_RD < OBJVI_ADDR_WR) && SLOT == ST_SPRMAP && OBJ_CE;
 	wire [34:0] OBJSI_Q;
-	mlab #(6,35) obj_spinfo
+	vdp_obj_spinfo OBJ_SPINFO
 	(
 		.clock(CLK),
-		.rdaddress(OBJSI_ADDR_RD),
-		.q(OBJSI_Q),
-		.wraddress(OBJSI_ADDR_WR),
-		.data(OBJSI_D),
-		.wren(OBJSI_WE)
+		.address_a(OBJSI_ADDR_RD),
+		.q_a(OBJSI_Q),
+		.address_b(OBJSI_ADDR_WR),
+		.data_b(OBJSI_D),
+		.wren_b(OBJSI_WE)
 	);
-	
+
 	ObjRenderInfo_t OBJRI[14];
 	
 	bit   [8:0] SPR_Y;
@@ -1635,7 +1635,8 @@ module VDP
 	end
 	wire       OBJL_WE = OBJRI_LAST.EN && !OBJ_PIX[3] && OBJL_Q[3:0] == 4'b0000;
 	wire [7:0] OBJL_Q;
-	mlab #(9,8) obj_line
+
+	vdp_obj_line OBJ_LINE
 	(
 		.clock(CLK),
 		.rdaddress(!DISP_EN_PIPE[2] ? OBJL_ADDR : DISP_X),
@@ -1644,7 +1645,7 @@ module VDP
 		.wren(!DISP_EN_PIPE[2] ? OBJL_WE : DCLK_CE),
 		.q(OBJL_Q)
 	);
-	
+
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			SCOL_FLAG <= 0;
