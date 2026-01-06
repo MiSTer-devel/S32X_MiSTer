@@ -9,7 +9,7 @@ module S32X_IF
 	input             VCLK,
 	input      [23:1] VA,
 	input      [15:0] VDI,
-	output     [15:0] VDO,
+	output reg [15:0] VDO,
 	input             AS_N,
 	output            DTACK_N,
 	input             LWR_N,
@@ -38,10 +38,10 @@ module S32X_IF
 	output            SHRES_N,
 	output            SHDREQ0_N,
 	output            SHDREQ1_N,
-	output      [3:1] SHMIRL_N,
-	output      [3:1] SHSIRL_N,
+	output reg  [3:1] SHMIRL_N,
+	output reg  [3:1] SHSIRL_N,
 	
-	output    [21:19] OVA,
+	output reg[21:19] OVA,
 	output            SEL,
 	
 	input      [15:0] CDI,
@@ -53,16 +53,16 @@ module S32X_IF
 	output            CCAS0_N,
 	output            CCAS2_N,
 	
-	output     [17:1] VDP_A,
+	output reg [17:1] VDP_A,
 	input      [15:0] VDP_DI,
-	output     [15:0] VDP_DO,
-	output            VDP_RD_N,
-	output            VDP_LWR_N,
-	output            VDP_UWR_N,
+	output reg [15:0] VDP_DO,
+	output reg        VDP_RD_N,
+	output reg        VDP_LWR_N,
+	output reg        VDP_UWR_N,
 	input             VDP_ACK_N,
-	output            VDP_DRAM_CS_N,
-	output            VDP_REG_CS_N,
-	output            VDP_PAL_CS_N,
+	output reg        VDP_DRAM_CS_N,
+	output reg        VDP_REG_CS_N,
+	output reg        VDP_PAL_CS_N,
 //	output            VDP_RW,
 //	output            VDP_DIR,
 //	output            VDP_ACCS,
@@ -71,17 +71,17 @@ module S32X_IF
 	input             VDP_HINT,
 //	output            VDP_C23,
 	
-	output     [15:0] PWM_L,
-	output     [15:0] PWM_R,
+	output reg [15:0] PWM_L,
+	output reg [15:0] PWM_R,
 	
 	input             ROM_WAIT,
 	
 	output     [23:0] DBG_VA,
-	output      [7:0] ROM_WAIT_CNT,
-	output            MD_CP_READ,
-	output            MD_CP_WRITE,
-	output            SH_CP_READ,
-	output            SH_CP_WRITE
+	output reg  [7:0] ROM_WAIT_CNT,
+	output reg        MD_CP_READ,
+	output reg        MD_CP_WRITE,
+	output reg        SH_CP_READ,
+	output reg        SH_CP_WRITE
 );
 	import S32X_PKG::*;
 

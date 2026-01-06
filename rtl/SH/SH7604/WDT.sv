@@ -33,7 +33,7 @@ module SH7604_WDT
 	output            IBUS_ACT,
 	
 	output            ITI_IRQ,
-	output            OVF,
+	output reg        OVF,
 	output            PRES,
 	output            MRES
 );

@@ -11,12 +11,12 @@ module VDP
 	input             RNW,
 	input             AS_N,
 	input      [15:0] DI,
-	output     [15:0] DO,
+	output reg [15:0] DO,
 	output            DTACK_N,
 	output            BR_N,
 	input             BG_N,
 	output            BGACK_N,
-	output      [2:1] IPL_N,
+	output reg  [2:1] IPL_N,
 
 	output            VINT,
 	output            HINT,
@@ -37,20 +37,20 @@ module VDP
 	input       [7:0] VRAM_Q,
 	output            VRAM_WE,
 
-	output            CE_PIX,
-	output            FIELD_OUT,
+	output  reg       CE_PIX,
+	output  reg       FIELD_OUT,
 	output            INTERLACE,
 	output      [1:0] RESOLUTION,
 	output            HBL,
 	output            VBL,
 
-	output      [3:0] R,
-	output      [3:0] G,
-	output      [3:0] B,
-	output            YS_N,
+	output reg  [3:0] R,
+	output reg  [3:0] G,
+	output reg  [3:0] B,
+	output reg        YS_N,
 	output            EDCLK,
-	output            HS_N,
-	output            VS_N,
+	output reg        HS_N,
+	output reg        VS_N,
 		
 	input             BORDER_EN,
 	input             VSCROLL_BUG, //'1';
@@ -721,7 +721,7 @@ module VDP
 	assign REFRESH = SLOT == ST_REFRESH && DMA_VBUS;
 	
 	//CRAM
-	wire  [6:1] CRAM_ADDR_A;
+	reg   [6:1] CRAM_ADDR_A;
 	wire  [8:0] CRAM_Q_A;
 	wire  [6:1] CRAM_ADDR_B = IO_ADDR[6:1];
 	wire  [8:0] CRAM_D = {IO_DATA[11:9],IO_DATA[7:5],IO_DATA[3:1]};
@@ -1620,7 +1620,7 @@ module VDP
 		end
 	end
 
-	wire [7:0] OBJL_D;
+	reg [7:0] OBJL_D;
 	always_comb begin
 		case (OBJ_PIX[2:0])
 			3'b100: OBJL_D = {OBJRI_LAST.BORD[2]                     , OBJRI_LAST.PRIO, OBJRI_LAST.PAL, OBJRI_LAST.DATA[31:28]};
