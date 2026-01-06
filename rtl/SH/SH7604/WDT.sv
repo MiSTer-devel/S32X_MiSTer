@@ -65,7 +65,7 @@ module SH7604_WDT
 			// synopsys translate_off
 			WDTOVF_N <= 1;
 			WRES <= 0;
-			// synopsys translate_onn
+			// synopsys translate_on
 		end
 		else begin
 			if (!RES_N) begin
@@ -96,7 +96,7 @@ module SH7604_WDT
 			SBY_TME <= 0;
 			// synopsys translate_off
 			NMI_OLD <= 0;
-			// synopsys translate_onn
+			// synopsys translate_on
 		end
 		else begin
 			if (!RES_N) begin
