@@ -16,16 +16,16 @@ module S32X_VDP
 	
 	input      [17:1] A,
 	input      [15:0] DI,
-	output     [15:0] DO,
+	output reg [15:0] DO,
 	input             RD_N,
 	input             LWR_N,
 	input             UWR_N,
-	output            ACK_N,
+	output reg        ACK_N,
 	input             DRAM_CS_N,
 	input             REG_CS_N,
 	input             PAL_CS_N,
 	
-	output            VINT,
+	output reg        VINT,
 	output            HINT,
 	
 	output     [15:0] FB0_A,
@@ -49,7 +49,7 @@ module S32X_VDP
 	output            YSO_N,	//0 - 32X pixel, 1 - MD pixel
 	output            HBL,
 	
-	output      [7:0] DBG_DOT_TIME
+	output reg  [7:0] DBG_DOT_TIME
 );
 	import S32X_PKG::*;
 	

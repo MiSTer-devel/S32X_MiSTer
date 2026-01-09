@@ -78,7 +78,7 @@ module BA
 	input         MEM_RDY,
 	input         PAUSE_EN,
 	
-	output  [7:0] DBG_Z80_HOOK
+	output reg [7:0] DBG_Z80_HOOK
 );
 
 	wire M68K_INTACK = &M68K_FC & ~M68K_AS_N;

@@ -208,6 +208,7 @@ wire        M68K_BG_N;
 wire        M68K_BR_N;
 wire        M68K_BGACK_N;
 reg   [2:0] M68K_IPL_N;
+wire        M68K_INTACK = &M68K_FC & ~M68K_AS_N;
 
 fx68k M68K
 (
@@ -229,20 +230,18 @@ fx68k M68K
 	.BGn(M68K_BG_N),
 	.BRn(M68K_BR_N),
 	.BGACKn(M68K_BGACK_N),
-	.HALTn(1),
+	.HALTn(1'b1),
 
 	.DTACKn(M68K_DTACK_N),
 	.VPAn(~M68K_INTACK),
-	.BERRn(1),
-	.IPL0n(1),
+	.BERRn(1'b1),
+	.IPL0n(1'b1),
 	.IPL1n(M68K_IPL_N[1]),
 	.IPL2n(M68K_IPL_N[2]),
 	.iEdb(/*genie_ovr ? genie_data : */M68K_DI),
 	.oEdb(M68K_DO),
 	.eab(M68K_A)
 );
-
-wire M68K_INTACK = &M68K_FC & ~M68K_AS_N;
 
 /*wire genie_ovr;
 wire [15:0] genie_data;
@@ -264,6 +263,8 @@ CODES #(.ADDR_WIDTH(24), .DATA_WIDTH(16)) codes (
 // 68K RAM
 //-----------------------------------------------------------------------
 wire [15:0] WRAM_Q;
+wire        RAM_N;
+
 dpram #(15) ram68k_u
 (
 	.clock(MCLK),
@@ -305,6 +306,13 @@ wire        Z80_RESET_N;
 wire        Z80_BUSRQ_N;
 wire        Z80_BUSAK_N;
 
+wire [15:0] ZA;
+wire  [7:0] ZDI;
+wire  [7:0] ZDO;
+wire        ZWR_N;
+wire        ZRD_N;
+wire        ZRAM_N;
+
 //T80s #(.T2Write(1)) Z80
 T80pa Z80
 (
@@ -319,7 +327,7 @@ T80pa Z80
 	.WAIT_n(Z80_WAIT_N),
 	.INT_n(Z80_INT_N),
 	.MREQ_n(Z80_MREQ_N),
-	.IORQ_n(1),
+	.IORQ_n(),
 	.RD_n(Z80_RD_N),
 	.WR_n(Z80_WR_N),
 	.A(Z80_A),
@@ -343,18 +351,25 @@ dpram #(13) ramZ80
 //--------------------------------------------------------------
 wire [15:0] BA_DI;
 
-wire        RAM_N;
 wire        IO_N;
 wire        VDP_N;
 wire        INTACK_N;
 
-wire [15:0] ZA;
-wire  [7:0] ZDI;
-wire  [7:0] ZDO;
-wire        ZWR_N;
-wire        ZRD_N;
-wire        ZRAM_N;
 wire        YM_N;
+
+wire [23:1] VBUS_A;
+wire [15:0] VBUS_D;
+wire        VBUS_SEL;
+wire        VBUS_DTACK_N;
+wire        VBUS_BR_N;
+wire        VBUS_BG_N;
+wire        VBUS_BGACK_N;
+
+wire  [7:0] IO_DO;
+wire        IO_DTACK_N;
+wire        HL;
+
+wire        VDP_DTACK_N;
 
 BA ba
 (
@@ -454,15 +469,6 @@ assign DBG_M68K_A = {M68K_A,1'b0};
 // VDP + PSG
 //--------------------------------------------------------------
 wire [15:0] VDP_DO;
-wire        VDP_DTACK_N;
-
-wire [23:1] VBUS_A;
-wire [15:0] VBUS_D;
-wire        VBUS_SEL;
-wire        VBUS_DTACK_N;
-wire        VBUS_BR_N;
-wire        VBUS_BG_N;
-wire        VBUS_BGACK_N;
 
 wire        M68K_EXINT;
 wire        M68K_HINT;
@@ -572,9 +578,6 @@ jt89 psg
 //--------------------------------------------------------------
 // Gamepads
 //--------------------------------------------------------------
-wire  [7:0] IO_DO;
-wire        IO_DTACK_N;
-wire        HL;
 
 multitap multitap
 (
