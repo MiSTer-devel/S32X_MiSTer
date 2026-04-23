@@ -9,7 +9,8 @@ module SH_core
 	input             RES_N,
 	input             NMI_N,
 	
-	output     [31:0] BUS_A,
+	output     [31:0] BUS_A_PRE,
+	output reg [31:0] BUS_A,
 	input      [31:0] BUS_DI,
 	output     [31:0] BUS_DO,
 	output            BUS_WR,
@@ -112,20 +113,27 @@ module SH_core
 	//PC
 	//**********************************************************
 	wire PC_STALL = (MA_ACTIVE & BUS_WAIT) | (IF_ACTIVE & BUS_WAIT) | (VECT_ACTIVE & VECT_WAIT) | INST_SPLIT | IFID_STALL;
+	bit [31: 0] PC_NEXT;
+	always @(*) begin
+		PC_NEXT = PC;
+		if (!RES_N) begin
+			PC_NEXT = '0;
+		end
+		else if (EN && CE) begin
+			if (PIPE.EX.DI.PCW && !EX_STALL) begin
+				PC_NEXT = ALU_RES;
+			end else if (!PC_STALL && !ID_DECI.SLP && !SLP) begin
+				PC_NEXT = PC + 2;
+			end
+		end
+	end
+
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			PC <= '0;
 		end
-		else if (!RES_N) begin
-			PC <= '0;
-		end
-		else if (EN && CE) begin
-			if (PIPE.EX.DI.PCW && !EX_STALL) begin
-				PC <= ALU_RES;
-			end else if (!PC_STALL && !ID_DECI.SLP && !SLP) begin
-				PC <= PC + 2;
-			end
-		end
+		else
+			PC <= PC_NEXT;
 	end
 
 	wire LOAD_ISSUE = (PIPE.EX.DI.MEM.R | (PIPE.EX.DI.MAC.R & ~PIPE.EX.DI.MEM.W)) & ((PIPE.EX.DI.RA.W & PIPE.EX.DI.RA.N == ID_DECI.RA.N & ID_DECI.RA.R) |
@@ -133,6 +141,17 @@ module SH_core
 	                                                                                 (PIPE.EX.DI.RA.W & PIPE.EX.DI.RA.N ==         5'd0 & ID_DECI.R0R ));
 	wire INST_ISSUE = ((IFID_STALL & ~PC[1]) | ~PIPE.ID.PC[1]) & (PIPE.EX.DI.MEM.R | PIPE.EX.DI.MEM.W | PIPE.EX.DI.MAC.R | PIPE.EX.DI.MAC.W) & ~ID_DECI.IID;
 	
+	bit MA_ACTIVE_NEXT;
+
+	always @(*) begin
+		MA_ACTIVE_NEXT = MA_ACTIVE;
+		if ((PIPE.EX.DI.MEM.R || PIPE.EX.DI.MEM.W || PIPE.EX.DI.MAC.R || PIPE.EX.DI.MAC.W) && !INST_SPLIT && (!IF_ACTIVE || !BUS_WAIT) && !(VECT_ACTIVE && VECT_WAIT)) begin
+			MA_ACTIVE_NEXT <= 1;
+		end else if (!BUS_WAIT && MA_ACTIVE) begin
+			MA_ACTIVE_NEXT <= 0;
+		end
+	end
+
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			MA_ACTIVE <= 0;
@@ -158,13 +177,7 @@ module SH_core
 				LOAD_SPLIT <= 0;
 			end
 			// synopsys translate_on
-			
-			if ((PIPE.EX.DI.MEM.R || PIPE.EX.DI.MEM.W || PIPE.EX.DI.MAC.R || PIPE.EX.DI.MAC.W) && !INST_SPLIT && (!IF_ACTIVE || !BUS_WAIT) && !(VECT_ACTIVE && VECT_WAIT)) begin
-				MA_ACTIVE <= 1;
-			end else if (!BUS_WAIT && MA_ACTIVE) begin
-				MA_ACTIVE <= 0;
-			end
-			
+			MA_ACTIVE <= MA_ACTIVE_NEXT;
 			if ((PC[1] && (!MA_ACTIVE || !BUS_WAIT) && !IFID_STALL && !EX_STALL) || (PIPE.EX.BC && (!MA_ACTIVE || !BUS_WAIT))) begin
 				IF_ACTIVE <= 1;
 			end else if (!BUS_WAIT && IF_ACTIVE && !PC_STALL) begin
@@ -816,7 +829,9 @@ module SH_core
 	assign REGS_WBE = PIPE.WB.DI.RB.W & (!PIPE.WB.DI.RA.W | PIPE.WB.DI.RA.N != PIPE.WB.DI.RB.N) & !WB_STALL;
 	
 	//Ports
-	assign BUS_A = MA_ACTIVE ? PIPE.MA.ADDR : (PC & 32'hFFFFFFFC);
+	assign BUS_A_PRE = CE ? (MA_ACTIVE_NEXT ? (EX_STALL ? PIPE.MA.ADDR : MA_ADDR) : (PC_NEXT & 32'hFFFFFFFC)) : BUS_A;
+	always @(posedge CLK) BUS_A <= BUS_A_PRE;
+
 	assign BUS_DO = MA_WDATA;
 	assign BUS_WR = PIPE.MA.DI.MEM.W & MA_ACTIVE;
 	assign BUS_BA = MA_BA | {4{IF_ACTIVE & ~INST_SPLIT & ~IFID_STALL}};
