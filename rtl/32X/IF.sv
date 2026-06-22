@@ -831,7 +831,7 @@ module S32X_IF
 						S32X_LWR <= ~LWR_N;
 						S32X_UWR <= ~UWR_N;
 						S32X_CAS0 <= ~CAS0_N;
-						ROM_ST <= USE_ROM_WAIT ? RS_MD_WAIT : RS_MD_READ;
+						ROM_ST <= RS_MD_WAIT;
 					end
 					ROM_WAIT_CNT <= '0;
 				end

@@ -7,7 +7,6 @@ module SH7604_CACHE (
 	
 	input             RES_N,
 	
-	input      [31:0] CBUS_A_PRE,
 	input      [31:0] CBUS_A,
 	input      [31:0] CBUS_DI,
 	output     [31:0] CBUS_DO,
@@ -338,10 +337,10 @@ module SH7604_CACHE (
 	bit  [19:0] CTAG1_Q;
 	bit  [19:0] CTAG2_Q;
 	bit  [19:0] CTAG3_Q;
-	CACHE_TAG tag0(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[0] & EN & CE_R), .rdaddress(CBUS_A_PRE[9:4]), .q(CTAG0_Q));
-	CACHE_TAG tag1(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[1] & EN & CE_R), .rdaddress(CBUS_A_PRE[9:4]), .q(CTAG1_Q));
-	CACHE_TAG tag2(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[2] & EN & CE_R), .rdaddress(CBUS_A_PRE[9:4]), .q(CTAG2_Q));
-	CACHE_TAG tag3(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[3] & EN & CE_R), .rdaddress(CBUS_A_PRE[9:4]), .q(CTAG3_Q));
+	CACHE_TAG tag0(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[0] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG0_Q));
+	CACHE_TAG tag1(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[1] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG1_Q));
+	CACHE_TAG tag2(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[2] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG2_Q));
+	CACHE_TAG tag3(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[3] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG3_Q));
 	
 	reg [63:0] TAG_DIRTY[4];
 	always @(posedge CLK or negedge RST_N) begin
@@ -501,7 +500,7 @@ module SH7604_CACHE (
 				end
 			end
 			IBUS_END = 0;//(IBREQ && IBUS_WRITE && !IBUS_WAIT);
-
+			
 			if (CBUS_REQ) begin
 				if (CBUS_WR) begin
 					if ((CACHE_AREA || NOCACHE_AREA || IO_AREA)) begin
