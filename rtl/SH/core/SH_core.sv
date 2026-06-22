@@ -9,8 +9,7 @@ module SH_core
 	input             RES_N,
 	input             NMI_N,
 	
-	output     [31:0] BUS_A_PRE,
-	output reg [31:0] BUS_A,
+	output     [31:0] BUS_A,
 	input      [31:0] BUS_DI,
 	output     [31:0] BUS_DO,
 	output            BUS_WR,
@@ -99,7 +98,7 @@ module SH_core
 	
 `ifdef DEBUG
 	assign REGS_RAN = EN ? ID_DECI.RA.N : DBG_REGN;
-`else
+`elsif
 	assign REGS_RAN = ID_DECI.RA.N;
 `endif
 	assign REGS_RBN = ID_DECI.RB.N;
@@ -113,17 +112,6 @@ module SH_core
 	//**********************************************************
 	wire PC_STALL = (MA_ACTIVE & BUS_WAIT) | (IF_ACTIVE & BUS_WAIT) | (VECT_ACTIVE & VECT_WAIT) | INST_SPLIT | IFID_STALL;
 	bit [31: 0] NPC;
-	bit [31: 0] PC_NEXT;
-
-	always @(*) begin
-		PC_NEXT = PC;
-		if (PIPE.EX.DI.PCW && !EX_STALL) begin
-			PC_NEXT <= ALU_RES;
-		end else if (!PC_STALL && !ID_DECI.SLP && !SLP) begin
-			PC_NEXT <= PC + 2;
-		end
-	end
-
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			NPC <= '0;
@@ -132,7 +120,11 @@ module SH_core
 			NPC <= '0;
 		end
 		else if (EN && CE) begin
-			NPC <= PC_NEXT;
+			if (PIPE.EX.DI.PCW && !EX_STALL) begin
+				NPC <= ALU_RES;
+			end else if (!PC_STALL && !ID_DECI.SLP && !SLP) begin
+				NPC <= PC + 2;
+			end
 		end
 	end
 	
@@ -142,18 +134,7 @@ module SH_core
 	                                                           (PIPE.EX.DI.RA.N == ID_DECI.RB.N & ID_DECI.RB.R) |
 	                                                           (PIPE.EX.DI.RA.N ==         5'd0 & ID_DECI.R0R));
 	wire INST_ISSUE = ((IFID_STALL & ~PC[1]) | ~PIPE.ID.PC[1]) & (PIPE.EX.DI.MEM.R | PIPE.EX.DI.MEM.W | PIPE.EX.DI.MAC.R | PIPE.EX.DI.MAC.W) & ~(ID_DECI.BR.BI & ID_DECI.BR.BT == UCB & ID_DECI.IMMT == SIMM12);
-
-	bit MA_ACTIVE_NEXT;
-
-	always @(*) begin
-		MA_ACTIVE_NEXT = MA_ACTIVE;
-		if ((PIPE.EX.DI.MEM.R || PIPE.EX.DI.MEM.W || PIPE.EX.DI.MAC.R || PIPE.EX.DI.MAC.W) && !INST_SPLIT && (!IF_ACTIVE || !BUS_WAIT) && !(VECT_ACTIVE && VECT_WAIT)) begin
-			MA_ACTIVE_NEXT <= 1;
-		end else if (!BUS_WAIT && MA_ACTIVE) begin
-			MA_ACTIVE_NEXT <= 0;
-		end
-	end
-
+	
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			MA_ACTIVE <= 0;
@@ -179,7 +160,13 @@ module SH_core
 				LOAD_SPLIT <= 0;
 			end
 			// synopsys translate_on
-			MA_ACTIVE <= MA_ACTIVE_NEXT;
+			
+			if ((PIPE.EX.DI.MEM.R || PIPE.EX.DI.MEM.W || PIPE.EX.DI.MAC.R || PIPE.EX.DI.MAC.W) && !INST_SPLIT && (!IF_ACTIVE || !BUS_WAIT) && !(VECT_ACTIVE && VECT_WAIT)) begin
+				MA_ACTIVE <= 1;
+			end else if (!BUS_WAIT && MA_ACTIVE) begin
+				MA_ACTIVE <= 0;
+			end
+			
 			if ((PC[1] && (!MA_ACTIVE || !BUS_WAIT) && !IFID_STALL && !EX_STALL) || (PIPE.EX.BC && (!MA_ACTIVE || !BUS_WAIT))) begin
 				IF_ACTIVE <= 1;
 			end else if (!BUS_WAIT && IF_ACTIVE && !PC_STALL) begin
@@ -215,7 +202,6 @@ module SH_core
 	//**********************************************************
 	assign IF_STALL = BUS_STALL | INST_SPLIT | IFID_STALL;
 	
-	wire       INT_BLOCKED = PIPE.EX.DI.IBI;
 	IFtoID_t   SAVE_ID;
 	always @(posedge CLK or negedge RST_N) begin
 		bit [15: 0] SAVE_IR;
@@ -252,7 +238,7 @@ module SH_core
 					SAVE_IR <= BUS_DI[15:0];
 				end
 				
-				if (ID_DECI.LST == 3'd0) begin
+				if (!ID_DECI.LST) begin
 					PIPE.ID.IR <= NEW_IR;
 					PIPE.ID.PC <= PC;
 				end
@@ -264,14 +250,14 @@ module SH_core
 			end
 			
 			if (!ID_STALL) begin
-				if (INT_REQ && !INT_BLOCKED && !ID_DELAY_SLOT && !IFID_STALL && !INT_REQ_LATCH) begin
+				if (INT_REQ && !INT_REQ_LATCH) begin
 					INT_REQ_LATCH <= 1;
 					INT_LVL_LATCH <= INT_LVL;
 				end else if (STATE == 3'd5 && INT_REQ_LATCH) begin
 					INT_REQ_LATCH <= 0;
 				end
 			
-				if ((ID_DECI.LST != 3'd0) && (STATE == ID_DECI.LST)) begin
+				if (ID_DECI.LST && STATE == ID_DECI.LST) begin
 					PIPE.ID <= SAVE_ID;
 				end
 			end
@@ -283,22 +269,18 @@ module SH_core
 	//**********************************************************
 	assign ID_STALL = BUS_STALL | INST_SPLIT;
 	
+	assign BR_COND = ID_DECI.BR.BI & ((SR_T == ID_DECI.BR.BCV) | (ID_DECI.BR.BT == UCB));
 	wire ID_DELAY_SLOT = ~PIPE.EX.DI.BR.BI & (PIPE.EX.DI.BR.BT == CB | PIPE.EX.DI.BR.BT == UCB);
 	
-	wire [15:0] DEC_IR = ((INT_REQ && !INT_BLOCKED) || INT_REQ_LATCH) && !ID_DELAY_SLOT && !IFID_STALL ? 16'hF100 : 
+	wire [15:0] DEC_IR = (INT_REQ | INT_REQ_LATCH) && !ID_DELAY_SLOT && !IFID_STALL ? 16'hF100 : 
 							   PIPE.EX.DI.ILI ? 16'hF204 :
 								ID_DELAY_SLOT && !PIPE.EX.DI.BR.BD ? 16'h0009 :
 								IFID_STALL ? PIPE.EX.IR : PIPE.ID.IR;
 								
-	DecInstr_t ID_DECI_RAW;
-	wire BR_COND_DEC;
-	assign ID_DECI_RAW = Decode(DEC_IR, STATE, 1'b0, VER);
-	assign BR_COND_DEC = ID_DECI_RAW.BR.BI & ((SR_T == ID_DECI_RAW.BR.BCV) | (ID_DECI_RAW.BR.BT == UCB));
-	assign BR_COND = BR_COND_DEC;
-	assign ID_DECI = Decode(DEC_IR, STATE, BR_COND_DEC, VER);
+	assign ID_DECI = Decode(DEC_IR, STATE, BR_COND, VER);
 	
 	
-	wire BP_T_EXID = ID_DECI_RAW.BR.BI & ID_DECI_RAW.BR.BT == CB & PIPE.EX.DI.CTRL.W & PIPE.EX.DI.CTRL.S == SR_;
+	wire BP_T_EXID = ID_DECI.BR.BI & ID_DECI.BR.BT == CB & PIPE.EX.DI.CTRL.W & PIPE.EX.DI.CTRL.S == SR_;
 	always_comb begin
 		if (BP_T_EXID) begin
 			SR_T = SR_NEW.T;
@@ -407,7 +389,6 @@ module SH_core
 			ZERO:   temp = 32'h00000000;
 			ONE:    temp = 32'h00000001;
 			VECT:   temp = {{24{1'b0}},      vec};
-			default: temp = 32'h00000000;
 		endcase
 		
 		if (PIPE.EX.DI.BR.BI) begin
@@ -424,7 +405,6 @@ module SH_core
 			SR_:  SCR_VAL = SR & 32'h000003F3;
 			GBR_: SCR_VAL = GBR;
 			VBR_: SCR_VAL = VBR;
-			default: SCR_VAL = 32'h00000000;
 		endcase
 		
 		if (BP_A_EXEX) begin
@@ -540,7 +520,7 @@ module SH_core
 		endcase
 		
 		adder_a = PIPE.EX.DI.ALU.OP == DIV ? {ALU_A[30:0],SR.T} : ALU_A;
-		adder_code = PIPE.EX.DI.ALU.OP == DIV ? {3'b000,(SR.M ~^ SR.Q)} : PIPE.EX.DI.ALU.CD;
+		adder_code = PIPE.EX.DI.ALU.OP == DIV ? {1'b0,SR.M~^SR.Q} : PIPE.EX.DI.ALU.CD;
 		adder_cmp = PIPE.EX.DI.ALU.CMP;
 		{ADDER_C,ADDER_RES} = Adder(adder_a,ALU_B,SR.T,adder_code);
 		ADDER_V = ~((ALU_A[31] ^ ALU_B[31]) ^ adder_code[0]) & (ALU_A[31] ^ ADDER_RES[31]);
@@ -574,36 +554,32 @@ module SH_core
 						2'b11: ALU_T = ge_hs & ~eq;
 						default:;
 					endcase
-					2'b10: ALU_T = ADDER_C;
-					2'b11: ALU_T = ADDER_V;
+					2'b10: ALU_T <= ADDER_C;
+					2'b11: ALU_T <= ADDER_V;
 					default:;
 				endcase
-			LOG: ALU_T = PIPE.EX.DI.ALU.CD[3] ? str_eq : LOG_Z;
-			SHIFT: ALU_T = SHIFT_C;
-			DIV: ALU_T = ADDER_C;
+			LOG: ALU_T <= PIPE.EX.DI.ALU.CD[3] ? str_eq : LOG_Z;
+			SHIFT: ALU_T <= SHIFT_C;
+			DIV: ALU_T <= ADDER_C;
 			default:;
 		endcase
 	end
 	
 	bit [31: 0] MA_ADDR;
 	always_comb begin
-		MA_ADDR = ALU_RES;
 		case (PIPE.EX.DI.MEM.ADDS)
 			ALUA:    MA_ADDR = REG_A;
 			ALUB:    MA_ADDR = REG_B;
 			ALURES:  MA_ADDR = ALU_RES;
-			default:;
 		endcase
 	end
 	
 	bit [31: 0] MA_WD;
 	always_comb begin
-		MA_WD = ALU_RES;
 		case (PIPE.EX.DI.MEM.WDS)
 			ALUA: MA_WD = REG_A;
 			ALUB: MA_WD = REG_B;
 			ALURES: MA_WD = ALU_RES;
-			default:;
 		endcase
 	end
 	
@@ -665,7 +641,6 @@ module SH_core
 				SR_NEW.T = 0;
 			end
 			IMSK: SR_NEW.I = INT_LVL_LATCH;
-			default:;
 		endcase
 	end
 	
@@ -816,14 +791,12 @@ module SH_core
 	assign REGS_WBE = PIPE.WB.DI.RB.W & (!PIPE.WB.DI.RA.W | PIPE.WB.DI.RA.N != PIPE.WB.DI.RB.N) & !WB_STALL;
 	
 	//Ports
-	assign BUS_A_PRE = CE ? (MA_ACTIVE_NEXT ? (EX_STALL ? PIPE.MA.ADDR : MA_ADDR) : (PC_NEXT & 32'hFFFFFFFC)) : BUS_A;
-	always @(posedge CLK) BUS_A <= BUS_A_PRE;
-
+	assign BUS_A = MA_ACTIVE ? PIPE.MA.ADDR : (PC & 32'hFFFFFFFC);
 	assign BUS_DO = MA_WDATA;
 	assign BUS_WR = PIPE.MA.DI.MEM.W & MA_ACTIVE;
 	assign BUS_BA = MA_BA | {4{IF_ACTIVE & ~INST_SPLIT & ~IFID_STALL}};
 	assign BUS_REQ = ((PIPE.MA.DI.MEM.R | PIPE.MA.DI.MEM.W) & MA_ACTIVE & ~MAWB_STALL) | (IF_ACTIVE & ~INST_SPLIT & ~IFID_STALL);
-	assign BUS_ID = ~(PIPE.MA.DI.MEM.DF & MA_ACTIVE & ~MAWB_STALL);
+	assign BUS_ID = ~MA_ACTIVE;
 	assign BUS_TAS = PIPE.MA.DI.TAS & MA_ACTIVE & ~MAWB_STALL;
 	
 	assign MAC_SEL = PIPE.MA.DI.MAC.S & {2{(MA_ACTIVE & ~MAWB_STALL)}};
@@ -832,7 +805,7 @@ module SH_core
 	assign MAC_WE = |PIPE.MA.DI.MAC.S & PIPE.MA.DI.MAC.W & MA_ACTIVE & ~MA_STALL;
 	
 	assign INT_MASK = SR.I;
-	assign INT_ACP = INT_REQ & ~INT_REQ_LATCH & ~INT_BLOCKED & ~ID_DELAY_SLOT & ~IFID_STALL & ~ID_STALL;
+	assign INT_ACP = INT_REQ & ~INT_REQ_LATCH & ~ID_STALL;
 	assign INT_ACK = PIPE.MA.DI.VECR & ~MA_STALL;
 	assign VECT_REQ = VECT_ACTIVE;
 	

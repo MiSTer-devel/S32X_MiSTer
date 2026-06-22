@@ -133,63 +133,43 @@ module SH7604_INTC (
 	assign IRL_REQ = |IRL_LVL; 
 	
 	always_comb begin
-		bit  [ 4: 0] IP[7];
-		
-		IP = '{7{5'd0}};
-		INT_ACTIVE <= '0;
-		
-		if ( NMI_REQ                                                                                                          ) begin 
-			IP[0] = 5'd16; IP[1] = 5'd16; IP[2] = 5'd16; IP[3] = 5'd16; IP[4] = 5'd16; IP[5] = 5'd16; IP[6] = 5'd16;
-			INT_ACTIVE <= NMI_INT; 
-		end
-		if ( UBC_IRQ                                                   && 4'd15       > INT_MASK && 5'd15              > IP[0]) begin 
-			IP[1] = 5'd15; IP[2] = 5'd15; IP[3] = 5'd15; IP[4] = 5'd15; IP[5] = 5'd15; IP[6] = 5'd15;
-			INT_ACTIVE <= UBC_INT; 
-		end
-		if ( IRL_REQ                                                   && IRL_LVL     > INT_MASK && {1'b0,IRL_LVL}     > IP[1]) begin 
-			IP[2] = {1'b0,IRL_LVL}; IP[3] = {1'b0,IRL_LVL}; IP[4] = {1'b0,IRL_LVL}; IP[5] = {1'b0,IRL_LVL}; IP[6] = {1'b0,IRL_LVL};
-			INT_ACTIVE <= IRL_INT; 
-		end
-		if ( DIVU_IRQ                                                  && IPRA.DIVUIP > INT_MASK && {1'b0,IPRA.DIVUIP} > IP[2]) begin 
-			IP[3] = {1'b0,IPRA.DIVUIP};  IP[4] = {1'b0,IPRA.DIVUIP}; IP[5] = {1'b0,IPRA.DIVUIP}; IP[6] = {1'b0,IPRA.DIVUIP};
-			INT_ACTIVE <= DIVU_INT; 
-		end
-		if ((DMAC0_IRQ   || DMAC1_IRQ                                ) && IPRA.DMACIP > INT_MASK && {1'b0,IPRA.DMACIP} > IP[3]) begin 
-			IP[4] = {1'b0,IPRA.DMACIP}; IP[5] = {1'b0,IPRA.DMACIP}; IP[6] = {1'b0,IPRA.DMACIP};
-			INT_ACTIVE <= DMAC0_IRQ ? DMAC0_INT : DMAC1_INT; 
-		end
-		if ((WDT_IRQ     || BSC_IRQ                                  ) && IPRA.WDTIP  > INT_MASK && {1'b0,IPRA.WDTIP}  > IP[4]) begin 
-			IP[5] = {1'b0,IPRA.WDTIP}; IP[6] = {1'b0,IPRA.WDTIP};
-			INT_ACTIVE <= WDT_IRQ ? WDT_INT : BSC_INT; 
-		end
-		if ((SCI_ERI_IRQ || SCI_RXI_IRQ || SCI_TXI_IRQ || SCI_TEI_IRQ) && IPRB.SCIIP  > INT_MASK && {1'b0,IPRB.SCIIP}  > IP[5]) begin 
-			IP[6] = {1'b0,IPRB.SCIIP};
-			INT_ACTIVE <= SCI_ERI_IRQ ? SCI_ERI_INT : SCI_RXI_IRQ ? SCI_RXI_INT : SCI_TXI_IRQ ? SCI_TXI_INT : SCI_TEI_INT; 
-		end
-		if ((FRT_ICI_IRQ || FRT_OCI_IRQ || FRT_OVI_IRQ               ) && IPRB.FRTIP  > INT_MASK && {1'b0,IPRB.FRTIP}  > IP[6]) begin
-			INT_ACTIVE <= FRT_ICI_IRQ ? FRT_ICI_INT : FRT_OCI_IRQ ? FRT_OCI_INT : FRT_OVI_INT; 
-		end
+		if      (NMI_REQ                              ) begin INT_ACTIVE <= NMI_INT; end
+		else if (UBC_IRQ     && 4'hF        > INT_MASK) begin INT_ACTIVE <= UBC_INT; end
+		else if (IRL_REQ     && IRL_LVL     > INT_MASK) begin INT_ACTIVE <= IRL_INT; end
+		else if (DIVU_IRQ    && IPRA.DIVUIP > INT_MASK) begin INT_ACTIVE <= DIVU_INT; end
+		else if (DMAC0_IRQ   && IPRA.DMACIP > INT_MASK) begin INT_ACTIVE <= DMAC0_INT; end
+		else if (DMAC1_IRQ   && IPRA.DMACIP > INT_MASK) begin INT_ACTIVE <= DMAC1_INT; end
+		else if (WDT_IRQ     && IPRA.WDTIP  > INT_MASK) begin INT_ACTIVE <= WDT_INT; end
+		else if (BSC_IRQ     && IPRA.WDTIP  > INT_MASK) begin INT_ACTIVE <= BSC_INT; end
+		else if (SCI_ERI_IRQ && IPRB.SCIIP  > INT_MASK) begin INT_ACTIVE <= SCI_ERI_INT; end
+		else if (SCI_RXI_IRQ && IPRB.SCIIP  > INT_MASK) begin INT_ACTIVE <= SCI_RXI_INT; end
+		else if (SCI_TXI_IRQ && IPRB.SCIIP  > INT_MASK) begin INT_ACTIVE <= SCI_TXI_INT; end
+		else if (SCI_TEI_IRQ && IPRB.SCIIP  > INT_MASK) begin INT_ACTIVE <= SCI_TEI_INT; end
+		else if (FRT_ICI_IRQ && IPRB.FRTIP  > INT_MASK) begin INT_ACTIVE <= FRT_ICI_INT; end
+		else if (FRT_OCI_IRQ && IPRB.FRTIP  > INT_MASK) begin INT_ACTIVE <= FRT_OCI_INT; end
+		else if (FRT_OVI_IRQ && IPRB.FRTIP  > INT_MASK) begin INT_ACTIVE <= FRT_OVI_INT; end
+		else                                            begin INT_ACTIVE <= '0; end
 	end
 	assign INT_REQ = |INT_ACTIVE;
 	
 	always_comb begin
 		case (INT_ACTIVE)
-			NMI_INT:     INT_LVL = 4'hF;
-			UBC_INT:     INT_LVL = 4'hF;
-			IRL_INT:     INT_LVL = IRL_LVL;
-			DIVU_INT:    INT_LVL = IPRA.DIVUIP;
-			DMAC0_INT:   INT_LVL = IPRA.DMACIP;
-			DMAC1_INT:   INT_LVL = IPRA.DMACIP;
-			WDT_INT:     INT_LVL = IPRA.WDTIP;
-			BSC_INT:     INT_LVL = IPRA.WDTIP;
-			SCI_ERI_INT: INT_LVL = IPRB.SCIIP;
-			SCI_RXI_INT: INT_LVL = IPRB.SCIIP;
-			SCI_TXI_INT: INT_LVL = IPRB.SCIIP;
-			SCI_TEI_INT: INT_LVL = IPRB.SCIIP;
-			FRT_ICI_INT: INT_LVL = IPRB.FRTIP;
-			FRT_OCI_INT: INT_LVL = IPRB.FRTIP;
-			FRT_OVI_INT: INT_LVL = IPRB.FRTIP;
-			default:     INT_LVL = 4'h0;
+			NMI_INT:     INT_LVL <= 4'hF;
+			UBC_INT:     INT_LVL <= 4'hF;
+			IRL_INT:     INT_LVL <= IRL_LVL;
+			DIVU_INT:    INT_LVL <= IPRA.DIVUIP;
+			DMAC0_INT:   INT_LVL <= IPRA.DMACIP;
+			DMAC1_INT:   INT_LVL <= IPRA.DMACIP;
+			WDT_INT:     INT_LVL <= IPRA.WDTIP;
+			BSC_INT:     INT_LVL <= IPRA.WDTIP;
+			SCI_ERI_INT: INT_LVL <= IPRB.SCIIP;
+			SCI_RXI_INT: INT_LVL <= IPRB.SCIIP;
+			SCI_TXI_INT: INT_LVL <= IPRB.SCIIP;
+			SCI_TEI_INT: INT_LVL <= IPRB.SCIIP;
+			FRT_ICI_INT: INT_LVL <= IPRB.FRTIP;
+			FRT_OCI_INT: INT_LVL <= IPRB.FRTIP;
+			FRT_OVI_INT: INT_LVL <= IPRB.FRTIP;
+			default:     INT_LVL <= 4'h0;
 		endcase
 	end
 	
@@ -197,22 +177,22 @@ module SH7604_INTC (
 	wire [ 7: 0] IRL_VEC = !ICR.VECMD ? {5'b01000,IRL_LVL_SAVE[3:1]} : VBUS_DI;
 	always_comb begin
 		case (INT_ACCEPTED)
-			NMI_INT:     INT_VEC = 8'd11;
-			UBC_INT:     INT_VEC = 8'd12;
-			IRL_INT:     INT_VEC = IRL_VEC;
-			DIVU_INT:    INT_VEC = DIVU_VEC;
-			DMAC0_INT:   INT_VEC = DMAC0_VEC;
-			DMAC1_INT:   INT_VEC = DMAC1_VEC;
-			WDT_INT:     INT_VEC = {1'b0,VCRWDT.WITV};
-			BSC_INT:     INT_VEC = {1'b0,VCRWDT.BCMV};
-			SCI_ERI_INT: INT_VEC = {1'b0,VCRA.SERV};
-			SCI_RXI_INT: INT_VEC = {1'b0,VCRA.SRXV};
-			SCI_TXI_INT: INT_VEC = {1'b0,VCRB.STXV};
-			SCI_TEI_INT: INT_VEC = {1'b0,VCRB.STEV};
-			FRT_ICI_INT: INT_VEC = {1'b0,VCRC.FICV};
-			FRT_OCI_INT: INT_VEC = {1'b0,VCRC.FOCV};
-			FRT_OVI_INT: INT_VEC = {1'b0,VCRD.FOVV};
-			default:     INT_VEC = 8'd0;
+			NMI_INT:     INT_VEC <= 8'd11;
+			UBC_INT:     INT_VEC <= 8'd12;
+			IRL_INT:     INT_VEC <= IRL_VEC;
+			DIVU_INT:    INT_VEC <= DIVU_VEC;
+			DMAC0_INT:   INT_VEC <= DMAC0_VEC;
+			DMAC1_INT:   INT_VEC <= DMAC1_VEC;
+			WDT_INT:     INT_VEC <= {1'b0,VCRWDT.WITV};
+			BSC_INT:     INT_VEC <= {1'b0,VCRWDT.BCMV};
+			SCI_ERI_INT: INT_VEC <= {1'b0,VCRA.SERV};
+			SCI_RXI_INT: INT_VEC <= {1'b0,VCRA.SRXV};
+			SCI_TXI_INT: INT_VEC <= {1'b0,VCRB.STXV};
+			SCI_TEI_INT: INT_VEC <= {1'b0,VCRB.STEV};
+			FRT_ICI_INT: INT_VEC <= {1'b0,VCRC.FICV};
+			FRT_OCI_INT: INT_VEC <= {1'b0,VCRC.FOCV};
+			FRT_OVI_INT: INT_VEC <= {1'b0,VCRD.FOVV};
+			default:     INT_VEC <= 8'd0;
 		endcase
 	end
 	
