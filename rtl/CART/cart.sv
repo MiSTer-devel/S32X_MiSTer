@@ -30,7 +30,7 @@ module CART
 	output            SRAM_RD,
 	output            SRAM_WR,
 	
-	input      [23:0] rom_sz,
+	input      [24:0] rom_sz,
 	input             s32x,					//[3] EPPROM bank present, [2:0] 0:none,1:128B,2:128B,3:256B
 	input       [3:0] eeprom_map,
 	input             noram_quirk,
@@ -86,7 +86,7 @@ module CART
 	                         ROM_LIN_EN  ? VA[23:1] :
 	                         {2'b00,VA[21:1]};
 	wire [15:1] SRAM_BANK_A = VA[15:1];
-	wire SRAM_EN = ((SRAM_BANK || ({2'b00,VA[21:1]} >= rom_sz[23:1] && !noram_quirk)) && VA[21] && !CE0_N);
+	wire SRAM_EN = ((SRAM_BANK || ({3'b000,VA[21:1]} >= rom_sz[24:1] && !noram_quirk)) && VA[21] && !CE0_N);
 	
 	//EEPROM mappers
 	reg         EEPROM_SDAI;
