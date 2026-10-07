@@ -79,6 +79,7 @@ module SH7604
 
 	import SH7604_PKG::*;
 	
+	bit [31:0] CBUS_A_PRE;
 	bit [31:0] CBUS_A;
 	bit [31:0] CBUS_DO;
 	bit [31:0] CBUS_DI;
@@ -229,6 +230,7 @@ module SH7604
 		.RES_N(RES_SYNC_N),
 		.NMI_N(NMI_N),
 		
+		.BUS_A_PRE(CBUS_A_PRE),
 		.BUS_A(CBUS_A),
 		.BUS_DI(CBUS_DI),
 		.BUS_DO(CBUS_DO),
@@ -302,6 +304,7 @@ module SH7604
 		
 		.RES_N(RES_SYNC_N),
 		
+		.CBUS_A_PRE(CBUS_A_PRE),
 		.CBUS_A(CBUS_A),
 		.CBUS_DI(CACHE_DI),
 		.CBUS_DO(CACHE_DO),
