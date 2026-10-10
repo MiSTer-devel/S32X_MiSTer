@@ -38,28 +38,28 @@ module sdram
 	input             init,			// init signal after FPGA config to initialize RAM
 	input             clk,			// sdram is accessed at up to 128MHz
 
-	input      [24:1] addr0,
+	input      [25:1] addr0,
 	input             rd0,
 	input      [ 1:0] wr0,
 	input      [15:0] din0,
 	output reg [15:0] dout0,
 	output            busy0,
 	
-	input      [24:1] addr1,
+	input      [25:1] addr1,
 	input             rd1,
 	input      [ 1:0] wr1,
 	input      [15:0] din1,
 	output reg [15:0] dout1,
 	output            busy1,
 	
-	input      [24:1] addr2,
+	input      [25:1] addr2,
 	input             rd2,
 	input      [ 1:0] wr2,
 	input      [15:0] din2,
 	output reg [15:0] dout2,
 	output            busy2,
 	
-	input      [24:1] addr3,
+	input      [25:1] addr3,
 	input             rd3,
 	input      [ 1:0] wr3,
 	input      [15:0] din3,
@@ -87,7 +87,7 @@ localparam STATE_READY = STATE_CONT+CAS_LATENCY+1'd1;
 localparam STATE_LAST  = STATE_READY;      // last state in cycle
 
 reg  [2:0] state;
-reg [22:1] a;
+reg [23:1] a;
 reg [15:0] data;
 reg        we;
 reg  [1:0] ba = 0;
@@ -100,7 +100,7 @@ reg  [1:0] ch_n = 0;
 wire [3:0] wr = {|wr3,|wr2,|wr1,|wr0};
 wire [3:0] rd = {rd3,rd2,rd1,rd0};
 
-reg [24:1] ch_addr[4] = '{4{'1}};
+reg [25:1] ch_addr[4] = '{4{'1}};
 reg [15:0] ch_din[4];
 reg  [1:0] ch_wr[4];
 
@@ -262,7 +262,7 @@ always @(posedge clk) begin
 	if(mode == MODE_NORMAL) begin
 		casex(state)
 			STATE_START: SDRAM_A <= a[13:1];
-			STATE_CONT:  SDRAM_A <= {dqm, 2'b10, a[22:14]};
+			STATE_CONT:  SDRAM_A <= {dqm, 1'b1, a[23:14]};
 		endcase;
 	end
 	else if(mode == MODE_LDM && state == STATE_START) SDRAM_A <= MODE;

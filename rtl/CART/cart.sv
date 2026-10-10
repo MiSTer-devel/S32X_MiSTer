@@ -17,7 +17,7 @@ module CART
 	input             ASEL_N,
 	input             TIME_N,
 	
-	output     [23:1] ROM_A,
+	output     [24:1] ROM_A,
 	input      [15:0] ROM_DI,
 	output     [15:0] ROM_DO,
 	output            ROM_RD,
@@ -30,7 +30,7 @@ module CART
 	output            SRAM_RD,
 	output            SRAM_WR,
 	
-	input      [24:0] rom_sz,
+	input      [25:0] rom_sz,
 	input             s32x,					//[3] EPPROM bank present, [2:0] 0:none,1:128B,2:128B,3:256B
 	input       [3:0] eeprom_map,
 	input             noram_quirk,
@@ -46,7 +46,7 @@ module CART
 	
 	//SRAM, SFF2 mappers
 	reg         SRAM_BANK;
-	reg   [4:0] ROM_BANK[8];
+	reg   [5:0] ROM_BANK[8];
 	reg         ROM_BANK_EN;
 	reg         ROM_BANK_WP;
 	always @(posedge CLK) begin
@@ -62,7 +62,7 @@ module CART
 						if (VA[3:1]) begin
 							ROM_BANK_EN <= 1;
 //							if (~PIER_QUIRK) begin // SSF2
-								ROM_BANK[VA[3:1]] <= VDI[4:0];
+								ROM_BANK[VA[3:1]] <= VDI[5:0];
 //							end
 //							else if (MBUS_A[3:1] == 4) begin // Pier EEPROM
 //								{ep_cs, ep_hold , ep_sck, ep_si} <= MBUS_DO[3:0];
@@ -82,11 +82,11 @@ module CART
 		end
 	end
 	wire ROM_LIN_EN = (rom_sz > 'h400000) & ~ROM_BANK_EN & ~s32x;	//Linear mapper
-	wire [23:1] ROM_BANK_A = ROM_BANK_EN ? {ROM_BANK[VA[21:19]], VA[18:1]} : 
-	                         ROM_LIN_EN  ? VA[23:1] :
-	                         {2'b00,VA[21:1]};
+	wire [24:1] ROM_BANK_A = ROM_BANK_EN ? {ROM_BANK[VA[21:19]], VA[18:1]} : 
+	                         ROM_LIN_EN  ? {1'b0,VA[23:1]} :
+	                         {3'b000,VA[21:1]};
 	wire [15:1] SRAM_BANK_A = VA[15:1];
-	wire SRAM_EN = ((SRAM_BANK || ({3'b000,VA[21:1]} >= rom_sz[24:1] && !noram_quirk)) && VA[21] && !CE0_N);
+	wire SRAM_EN = ((SRAM_BANK || ({4'b0000,VA[21:1]} >= rom_sz[25:1] && !noram_quirk)) && VA[21] && !CE0_N);
 	
 	//EEPROM mappers
 	reg         EEPROM_SDAI;
@@ -235,10 +235,10 @@ module CART
 	                   sf_map[1:0] == 2'd3 ? SF004_SRAM_EN :
 	                                         SRAM_EN;
 	
-	assign ROM_A = realtec_map         ? REALTEC_A : 
-					   sf_map[1:0] == 2'd1 ? SF001_ROM_A : 
-						sf_map[1:0] == 2'd2 ? SF002_ROM_A : 
-						sf_map[1:0] == 2'd3 ? SF004_ROM_A : 
+	assign ROM_A = realtec_map         ? {1'b0,REALTEC_A} : 
+					   sf_map[1:0] == 2'd1 ? {1'b0,SF001_ROM_A} : 
+						sf_map[1:0] == 2'd2 ? {1'b0,SF002_ROM_A} : 
+						sf_map[1:0] == 2'd3 ? {1'b0,SF004_ROM_A} : 
 						                      ROM_BANK_A;
 	assign ROM_DO = VDI;
 	assign ROM_RD = ROM_ACCESS & ~SRAM_ACCESS & ~CAS0_N;

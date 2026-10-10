@@ -175,7 +175,7 @@ wire [11:0] joystick_0,joystick_1,joystick_2,joystick_3,joystick_4;
 wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
 wire        ioctl_download;
 wire        ioctl_wr;
-wire [24:0] ioctl_addr;
+wire [25:0] ioctl_addr;
 wire [15:0] ioctl_data;
 wire  [7:0] ioctl_index;
 reg         ioctl_wait = 0;
@@ -645,7 +645,7 @@ assign S32X_ROM_WAIT = CART_SRAM_RD || CART_SRAM_WR ? sdr_busy[2] : sdr_busy[1];
 wire [15:0] CART_VDO;
 wire        CART_DTACK_N;
 
-wire [23:1] CART_ROM_A;
+wire [24:1] CART_ROM_A;
 wire [15:0] CART_ROM_DI;
 wire [15:0] CART_ROM_DO;
 wire        CART_ROM_WRL;
@@ -710,25 +710,23 @@ end
 reg use_sdr = 0;
 
 wire ddr_busy;
-wire [31:0] ddr_do;
+wire [15:0] ddr_do;
 ddram ddram
 (
 	.*,
 
 	.clk(clk_ram),
+	.rst(reset),
 
-	.mem_addr({10'b0000000000,S32X_SDR_A}),
-	.mem_dout(ddr_do),
-	.mem_din({16'h0000,S32X_SDR_DO}),
-	.mem_rd(S32X_SDR_CS & S32X_SDR_RD),
-	.mem_wr({2'b00,{2{S32X_SDR_CS}} & S32X_SDR_WE}),
-	.mem_chan(0),
-	.mem_16b(1),
-	.mem_busy(ddr_busy)
+	.ramh_addr(S32X_SDR_A),
+	.ramh_dout(ddr_do),
+	.ramh_din(S32X_SDR_DO),
+	.ramh_rd(S32X_SDR_CS & S32X_SDR_RD),
+	.ramh_wr({2{S32X_SDR_CS}} & S32X_SDR_WE),
+	.ramh_busy(ddr_busy)
 );
-assign S32X_SDR_DI   = ddr_do[15:0];
+assign S32X_SDR_DI   = ddr_do;
 assign S32X_SDR_WAIT = ddr_busy;
-
 
 wire sdr_busy[4];
 wire [15:0] sdr_do[4];
@@ -739,7 +737,7 @@ sdram sdram
 	.clk(clk_ram),
 
 	//SDRAM
-	.addr0({7'b1000000,S32X_SDR_A}), // 1000000-103FFFF
+	.addr0({8'b10000000,S32X_SDR_A}), // 2000000-203FFFF
 	.din0(S32X_SDR_DO),
 	.dout0(sdr_do[0]),
 	.rd0(use_sdr & S32X_SDR_CS & S32X_SDR_RD),
@@ -747,7 +745,7 @@ sdram sdram
 	.busy0(sdr_busy[0]),
 
 	//CART ROM
-	.addr1({1'b0,CART_ROM_A[23:1]}),
+	.addr1({1'b0,CART_ROM_A[24:1]}),
 	.din1(CART_ROM_DO),
 	.dout1(sdr_do[1]),
 	.rd1(CART_ROM_RD | CART_ROM_WRL | CART_ROM_WRH),
@@ -755,7 +753,7 @@ sdram sdram
 	.busy1(sdr_busy[1]),
 
 	//CART SRAM
-	.addr2({9'b110000000,CART_SRAM_A[15:1]}),	//CART RAM 1800000-180FFFF
+	.addr2({10'b1100000000,CART_SRAM_A[15:1]}),	//CART RAM 3000000-300FFFF
 	.din2({8'hFF,CART_SRAM_DO}),
 	.dout2(sdr_do[2]),
 	.rd2(CART_SRAM_RD),
@@ -763,7 +761,7 @@ sdram sdram
 	.busy2(sdr_busy[2]),
 	
 	//ROM/BRAM Load/Save
-	.addr3(rom_download ? {1'b0,ioctl_addr[23:1]} : {9'b110000000,sd_lba[6:0],tmpram_addr}),
+	.addr3(rom_download ? {1'b0,ioctl_addr[24:1]} : {10'b1100000000,sd_lba[6:0],tmpram_addr}),
 	.din3(rom_download ? {ioctl_data[7:0],ioctl_data[15:8]} : {tmpram_dout[7:0],tmpram_dout[15:8]}),
 	.dout3(sdr_do[3]),
 	.rd3(rom_download ? 1'b0 : (tmpram_req & ~bk_loading)),
@@ -771,7 +769,7 @@ sdram sdram
 	.busy3(sdr_busy[3])
 );
 
-`ifdef DUAL_SDRAM
+`ifdef MISTER_DUAL_SDRAM
 wire sdr2_busy;
 wire [15:0] sdr2_do;
 sdram2 sdram2
@@ -1064,7 +1062,7 @@ always @(posedge clk_sys) begin
 	if(old_ready & ~cart_hdr_ready) region_set <= 0;
 end
 
-reg [24:0] rom_sz;
+reg [25:0] rom_sz;
 reg s32x_rom = 0;
 always @(posedge clk_sys) begin
 	reg old_download;
@@ -1077,7 +1075,7 @@ always @(posedge clk_sys) begin
 	
 	if(old_download && ~rom_download) begin
 		cart_hdr_ready <= 0;
-		rom_sz <= ioctl_addr[24:0];
+		rom_sz <= ioctl_addr[25:0];
 	end
 
 	if(ioctl_wr & rom_download) begin
