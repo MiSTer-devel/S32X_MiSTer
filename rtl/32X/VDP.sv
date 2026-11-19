@@ -423,7 +423,7 @@ module S32X_VDP
 		else begin
 			if (DOT_CE) begin
 				if (H_CNT == 9'h017-1) begin
-					LINE_LEAD <= {FB_DISP_Q, SFT | &MODE};
+					LINE_LEAD <= {FB_DISP_Q, (SFT & ~&FB_DISP_Q[7:0]) | &MODE};
 					PIX_DATA <= '0;
 				end
 				else if (HDISP[0])  begin
